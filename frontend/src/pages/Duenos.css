@@ -1,0 +1,605 @@
+/* =========================
+   PAGINA DE DUEÑOS
+   ========================= */
+
+.duenos-page {
+  width: 100%;
+}
+
+.duenos-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.duenos-header h3 {
+  margin: 7px 0;
+  font-size: 25px;
+}
+
+.duenos-header p {
+  margin: 0;
+  color: #76827b;
+  font-size: 14px;
+}
+
+/* =========================
+   TARJETA PRINCIPAL
+   ========================= */
+
+.duenos-card {
+  background: white;
+  border: 1px solid #e5eae7;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.duenos-card-header {
+  min-height: 75px;
+  padding: 17px 22px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  border-bottom: 1px solid #edf0ee;
+}
+
+.duenos-card-header strong {
+  display: block;
+  color: #17211b;
+  font-size: 14px;
+}
+
+.duenos-card-header span {
+  display: block;
+  color: #929c96;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+/* =========================
+   BUSCADOR
+   ========================= */
+
+.duenos-search {
+  width: 230px;
+  padding: 10px 13px;
+
+  border: 1px solid #dce5e0;
+  border-radius: 8px;
+
+  outline: none;
+  background: #fafcfb;
+
+  font-family: inherit;
+}
+
+.duenos-search:focus {
+  border-color: #2f8f5b;
+  box-shadow: 0 0 0 3px rgba(47, 143, 91, 0.1);
+}
+
+/* =========================
+   TABLA
+   ========================= */
+
+.duenos-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.duenos-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.duenos-table th {
+  padding: 13px 20px;
+
+  background: #fafcfb;
+  color: #7b8881;
+
+  text-align: left;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+
+  border-bottom: 1px solid #edf0ee;
+}
+
+.duenos-table td {
+  padding: 16px 20px;
+
+  color: #56625b;
+  font-size: 12px;
+
+  border-bottom: 1px solid #edf0ee;
+}
+
+.duenos-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.duenos-table tbody tr:hover {
+  background: #fafcfb;
+}
+
+/* =========================
+   DUEÑO
+   ========================= */
+
+.dueno-name {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.dueno-name strong {
+  color: #263a30;
+  font-size: 12px;
+}
+
+.dueno-avatar {
+  width: 34px;
+  height: 34px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #e4f3e9;
+  color: #28794c;
+
+  border-radius: 9px;
+
+  font-weight: bold;
+}
+
+/* =========================
+   ACCIONES
+   ========================= */
+
+.dueno-actions {
+  display: flex;
+  gap: 7px;
+}
+
+.dueno-actions button {
+  border: 1px solid #dfe7e2;
+  background: white;
+
+  padding: 6px 9px;
+
+  border-radius: 6px;
+
+  color: #43705a;
+
+  font-size: 10px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.dueno-actions button:hover {
+  background: #f1f7f4;
+}
+
+.dueno-actions button.danger {
+  color: #b84b4b;
+}
+
+.dueno-actions button.danger:hover {
+  background: #fff3f3;
+  border-color: #f0cccc;
+}
+
+/* =========================
+   MENSAJES
+   ========================= */
+
+.duenos-message {
+  padding: 50px 20px;
+
+  text-align: center;
+
+  color: #718078;
+}
+
+.duenos-message.error {
+  color: #b64242;
+}
+
+/* =========================
+   ESTADO VACIO
+   ========================= */
+
+.duenos-empty {
+  min-height: 330px;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 40px;
+
+  text-align: center;
+}
+
+.duenos-empty-icon {
+  width: 55px;
+  height: 55px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #e5f4eb;
+  color: #287b4d;
+
+  border-radius: 14px;
+
+  font-size: 23px;
+}
+
+.duenos-empty h4 {
+  margin: 17px 0 7px;
+
+  font-size: 16px;
+}
+
+.duenos-empty p {
+  color: #849089;
+
+  font-size: 12px;
+
+  margin: 0 0 20px;
+}
+
+/* =========================
+   MODAL
+   ========================= */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+
+  z-index: 1000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+
+  background: rgba(13, 35, 26, 0.55);
+
+  backdrop-filter: blur(3px);
+}
+
+.dueno-modal {
+  width: 100%;
+  max-width: 580px;
+
+  background: white;
+
+  border-radius: 14px;
+
+  box-shadow: 0 25px 70px rgba(18, 55, 42, 0.25);
+
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+
+  padding: 22px 25px;
+
+  border-bottom: 1px solid #edf0ee;
+}
+
+.modal-header h3 {
+  margin: 5px 0 0;
+
+  font-size: 20px;
+}
+
+.modal-close {
+  width: 34px;
+  height: 34px;
+
+  border: none;
+  border-radius: 8px;
+
+  background: #f3f6f4;
+  color: #627069;
+
+  font-size: 22px;
+
+  cursor: pointer;
+}
+
+.modal-close:hover {
+  background: #e8eeea;
+}
+
+.modal-body {
+  padding: 25px;
+}
+
+/* =========================
+   FORMULARIO
+   ========================= */
+
+.form-row {
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  gap: 15px;
+}
+
+.modal-body .form-group {
+  margin-bottom: 20px;
+}
+
+.modal-body .form-group label {
+  display: block;
+
+  margin-bottom: 8px;
+
+  color: #284c3d;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.modal-body .form-group input {
+  width: 100%;
+
+  box-sizing: border-box;
+
+  padding: 13px 15px;
+
+  border: 1px solid #dce5e0;
+  border-radius: 10px;
+
+  background: #fafcfb;
+
+  font-family: inherit;
+  font-size: 14px;
+
+  outline: none;
+}
+
+.modal-body .form-group input:focus {
+  border-color: #2f8f5b;
+
+  box-shadow: 0 0 0 3px rgba(47, 143, 91, 0.1);
+
+  background: white;
+}
+
+.modal-body textarea {
+  width: 100%;
+  min-height: 90px;
+
+  box-sizing: border-box;
+
+  resize: vertical;
+
+  padding: 13px 15px;
+
+  border: 1px solid #dce5e0;
+  border-radius: 10px;
+
+  background: #fafcfb;
+
+  font-family: inherit;
+  font-size: 14px;
+
+  outline: none;
+}
+
+.modal-body textarea:focus {
+  border-color: #2f8f5b;
+
+  box-shadow: 0 0 0 3px rgba(47, 143, 91, 0.1);
+
+  background: white;
+}
+
+/* =========================
+   ERROR DEL MODAL
+   ========================= */
+
+.modal-error {
+  padding: 11px 13px;
+
+  background: #fff1f1;
+  color: #b64242;
+
+  border: 1px solid #ffd5d5;
+  border-radius: 8px;
+
+  font-size: 12px;
+}
+
+/* =========================
+   PIE DEL MODAL
+   ========================= */
+
+.modal-footer {
+  display: flex;
+
+  justify-content: flex-end;
+
+  gap: 10px;
+
+  padding: 17px 25px;
+
+  background: #fafcfb;
+
+  border-top: 1px solid #edf0ee;
+}
+
+.secondary-button {
+  padding: 11px 17px;
+
+  border: 1px solid #d9e2dd;
+  border-radius: 8px;
+
+  background: white;
+  color: #536159;
+
+  font-weight: bold;
+
+  cursor: pointer;
+}
+
+.secondary-button:hover {
+  background: #f2f6f4;
+}
+
+.secondary-button:disabled,
+.primary-button:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
+}
+
+/* =========================
+   RESPONSIVE
+   ========================= */
+
+@media (max-width: 700px) {
+  .duenos-header,
+  .duenos-card-header {
+    align-items: flex-start;
+
+    flex-direction: column;
+
+    gap: 15px;
+  }
+
+  .duenos-search {
+    width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================
+   MODAL ELIMINAR
+   ========================= */
+
+.delete-modal {
+  width: 100%;
+  max-width: 430px;
+
+  background: white;
+  border-radius: 16px;
+
+  padding: 32px;
+
+  text-align: center;
+
+  box-shadow: 0 25px 70px rgba(18, 55, 42, 0.25);
+}
+
+.delete-icon {
+  width: 55px;
+  height: 55px;
+
+  margin: 0 auto 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #fff0f0;
+  color: #c84d4d;
+
+  font-size: 25px;
+  font-weight: bold;
+}
+
+.delete-modal h3 {
+  margin: 0 0 12px;
+
+  color: #202b25;
+
+  font-size: 20px;
+}
+
+.delete-modal p {
+  margin: 0;
+
+  color: #66736c;
+
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.delete-modal p strong {
+  color: #263a30;
+}
+
+.delete-warning {
+  display: block;
+
+  margin-top: 8px;
+
+  color: #9a6969;
+
+  font-size: 11px;
+}
+
+.delete-actions {
+  display: flex;
+  justify-content: center;
+
+  gap: 10px;
+
+  margin-top: 25px;
+}
+
+.delete-button {
+  padding: 11px 18px;
+
+  border: none;
+  border-radius: 8px;
+
+  background: #c94f4f;
+  color: white;
+
+  font-family: inherit;
+  font-weight: bold;
+
+  cursor: pointer;
+}
+
+.delete-button:hover {
+  background: #b64242;
+}
+
+.delete-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

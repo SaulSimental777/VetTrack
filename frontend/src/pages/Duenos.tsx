@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { apiFetch } from '../lib/api'
 import './Duenos.css'
 
 interface Dueno {
@@ -29,31 +29,28 @@ function Duenos() {
   const [correo, setCorreo] = useState('')
   const [direccion, setDireccion] = useState('')
 
-  const cargarDuenos = async () => {
-    setLoading(true)
-    setError('')
+const cargarDuenos = async () => {
+  setLoading(true)
+  setError('')
 
-    const { data, error } = await supabase
-      .from('dueno')
-      .select(`
-        id_dueno,
-        nombre,
-        telefono,
-        correo,
-        direccion
-      `)
-      .order('nombre')
+  try {
+    const data =
+      await apiFetch<Dueno[]>('/api/duenos')
 
-    if (error) {
-      console.error('Error al cargar dueños:', error)
-      setError('No se pudieron cargar los dueños.')
-      setLoading(false)
-      return
-    }
+    setDuenos(data)
+  } catch (error) {
+    console.error(
+      'Error al cargar dueños:',
+      error
+    )
 
-    setDuenos(data ?? [])
+    setError(
+      'No se pudieron cargar los dueños.'
+    )
+  } finally {
     setLoading(false)
   }
+}
 
   useEffect(() => {
     cargarDuenos()
@@ -105,90 +102,65 @@ function Duenos() {
   )
 })
 
-  const guardarDueno = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const guardarDueno = async (
+  e: React.FormEvent
+) => {
+  e.preventDefault()
 
-    if (!nombre.trim()) {
-      setError('El nombre del dueño es obligatorio.')
-      return
-    }
+  if (!nombre.trim()) {
+    setError(
+      'El nombre del dueño es obligatorio.'
+    )
+    return
+  }
 
-    setGuardando(true)
-    setError('')
+  setGuardando(true)
+  setError('')
 
-    // Obtener el usuario autenticado
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+  const datosDueno = {
+    nombre: nombre.trim(),
+    telefono: telefono.trim() || null,
+    correo: correo.trim() || null,
+    direccion: direccion.trim() || null,
+  }
 
-    if (userError || !user) {
-      console.error('Error al obtener usuario:', userError)
-      setError('No se pudo identificar al usuario autenticado.')
-      setGuardando(false)
-      return
-    }
-
-    // Obtener la veterinaria asociada al usuario
-    const { data: perfil, error: perfilError } = await supabase
-      .from('perfilusuario')
-      .select('id_veterinaria')
-      .eq('id', user.id)
-      .single()
-
-    if (perfilError || !perfil?.id_veterinaria) {
-      console.error('Error al obtener perfil:', perfilError)
-      setError('No se pudo identificar la clínica del usuario.')
-      setGuardando(false)
-      return
-    }
-
-    // Registrar el dueño dentro del tenant actual
+  try {
     if (duenoEditando) {
-  // Editar dueño existente
-  const { error: updateError } = await supabase
-    .from('dueno')
-    .update({
-      nombre: nombre.trim(),
-      telefono: telefono.trim() || null,
-      correo: correo.trim() || null,
-      direccion: direccion.trim() || null,
-    })
-    .eq('id_dueno', duenoEditando.id_dueno)
+      await apiFetch(
+        `/api/duenos/${duenoEditando.id_dueno}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(datosDueno),
+        }
+      )
+    } else {
+      await apiFetch('/api/duenos', {
+        method: 'POST',
+        body: JSON.stringify(datosDueno),
+      })
+    }
 
-  if (updateError) {
-    console.error('Error al actualizar dueño:', updateError)
-    setError('No se pudo actualizar el dueño.')
-    setGuardando(false)
-    return
-  }
-} else {
-  // Registrar dueño nuevo
-  const { error: insertError } = await supabase
-    .from('dueno')
-    .insert({
-      nombre: nombre.trim(),
-      telefono: telefono.trim() || null,
-      correo: correo.trim() || null,
-      direccion: direccion.trim() || null,
-      id_veterinaria: perfil.id_veterinaria,
-    })
-
-  if (insertError) {
-    console.error('Error al registrar dueño:', insertError)
-    setError('No se pudo registrar el dueño.')
-    setGuardando(false)
-    return
-  }
-}
-
-    setGuardando(false)
     setModalAbierto(false)
     setDuenoEditando(null)
+
     limpiarFormulario()
 
     await cargarDuenos()
+  } catch (error) {
+    console.error(
+      'Error al guardar dueño:',
+      error
+    )
+
+    setError(
+      error instanceof Error
+        ? error.message
+        : 'No se pudo guardar el dueño.'
+    )
+  } finally {
+    setGuardando(false)
   }
+}
 
 const eliminarDueno = async () => {
   if (!duenoEliminando) return
@@ -196,22 +168,31 @@ const eliminarDueno = async () => {
   setEliminando(true)
   setError('')
 
-  const { error: deleteError } = await supabase
-    .from('dueno')
-    .delete()
-    .eq('id_dueno', duenoEliminando.id_dueno)
+  try {
+    await apiFetch(
+      `/api/duenos/${duenoEliminando.id_dueno}`,
+      {
+        method: 'DELETE',
+      }
+    )
 
-  if (deleteError) {
-    console.error('Error al eliminar dueño:', deleteError)
-    setError('No se pudo eliminar el dueño.')
+    setDuenoEliminando(null)
+
+    await cargarDuenos()
+  } catch (error) {
+    console.error(
+      'Error al eliminar dueño:',
+      error
+    )
+
+    setError(
+      error instanceof Error
+        ? error.message
+        : 'No se pudo eliminar el dueño.'
+    )
+  } finally {
     setEliminando(false)
-    return
   }
-
-  setEliminando(false)
-  setDuenoEliminando(null)
-
-  await cargarDuenos()
 }
 
   return (

@@ -2,12 +2,18 @@ require('dotenv').config()
 
 const express = require('express')
 const cors = require('cors')
-const supabase = require('./config/supabase')
+
+const duenosRoutes = require('./routes/duenos.routes')
 
 const app = express()
 const PORT = process.env.PORT || 3000
 
-app.use(cors())
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  })
+)
+
 app.use(express.json())
 
 app.get('/', (req, res) => {
@@ -16,23 +22,14 @@ app.get('/', (req, res) => {
   })
 })
 
-app.get('/api/prueba-supabase', async (req, res) => {
-  const { data, error } = await supabase
-    .from('veterinaria')
-    .select('id_veterinaria, nombre')
-    .limit(10)
-
-  if (error) {
-    return res.status(500).json({
-      error: error.message,
-    })
-  }
-
+app.get('/api/health', (req, res) => {
   res.json({
-    mensaje: 'Node.js conectado correctamente con Supabase',
-    veterinarias: data,
+    status: 'ok',
+    servicio: 'VetTrack API',
   })
 })
+
+app.use('/api/duenos', duenosRoutes)
 
 app.listen(PORT, () => {
   console.log(`VetTrack Backend ejecutándose en http://localhost:${PORT}`)

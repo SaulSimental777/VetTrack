@@ -95,6 +95,38 @@ button {
   text-align: center;
 }
 
+.nav-item .nav-label {
+  width: auto;
+  text-align: left;
+}
+
+.nav-item:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.nav-item:focus-visible {
+  outline: 2px solid #b6ebc8;
+  outline-offset: 2px;
+}
+
+.loading-screen {
+  min-height: 100vh;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.loading-screen p { max-width: 560px; color: #536159; line-height: 1.6; }
+.loading-logo { background: #2f8f5b; color: white; padding: 16px 22px; border-radius: 12px; font-size: 28px; font-weight: bold; }
+.session-actions { background: #12372a; border-radius: 9px; }
+.logout-error { color: #ffd5d5; font-size: 12px; line-height: 1.5; padding: 0 12px; }
+.dashboard-error { color: #a02d2d; line-height: 1.6; font-size: 14px; }
+.dashboard-placeholder { padding: 12px 22px 24px; color: #68786f; font-size: 14px; line-height: 1.6; }
+
 .nav-item:hover {
   background: rgba(255, 255, 255, 0.08);
   color: white;
@@ -513,13 +545,17 @@ button {
     padding: 20px 10px;
   }
 
-  .brand div:last-child,
-  .nav-item:not(.active) {
-    font-size: 0;
-  }
-
   .brand div:last-child {
     display: none;
+  }
+
+  .nav-item .nav-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .nav-item {
@@ -538,10 +574,14 @@ button {
     padding: 18px 20px;
   }
 
-  .user-info,
   .clinic {
     display: none;
   }
+
+  .user-area { min-width: 0; }
+  .user-info { max-width: 150px; min-width: 0; overflow-wrap: anywhere; }
+  .user-avatar { flex-shrink: 0; }
+  .topbar { gap: 15px; flex-wrap: wrap; }
 }
 
 @media (max-width: 600px) {

@@ -53,7 +53,22 @@ const cargarDuenos = async () => {
 }
 
   useEffect(() => {
-    cargarDuenos()
+    const controller = new AbortController()
+
+    apiFetch<Dueno[]>('/api/duenos', { signal: controller.signal })
+      .then(data => {
+        if (!controller.signal.aborted) setDuenos(data)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setError('No se pudieron cargar los dueños.')
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false)
+      })
+
+    return () => controller.abort()
   }, [])
 
   const limpiarFormulario = () => {

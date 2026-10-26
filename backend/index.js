@@ -4,6 +4,7 @@ const express = require('express')
 const cors = require('cors')
 
 const duenosRoutes = require('./routes/duenos.routes')
+const tenantsRoutes = require('./routes/tenants.routes')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -30,7 +31,12 @@ app.get('/api/health', (req, res) => {
 })
 
 app.use('/api/duenos', duenosRoutes)
+app.use('/api/tenants', tenantsRoutes)
 
-app.listen(PORT, () => {
-  console.log(`VetTrack Backend ejecutándose en http://localhost:${PORT}`)
-})
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`VetTrack Backend ejecutándose en http://localhost:${PORT}`)
+  })
+}
+
+module.exports = app

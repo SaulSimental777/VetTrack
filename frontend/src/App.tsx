@@ -1,382 +1,220 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import Login from './pages/login'
 import Duenos from './pages/Duenos'
+import Tenants from './pages/Tenants'
+import Dashboard from './pages/Dashboard'
 import './App.css'
 
+type Pagina = 'dashboard' | 'duenos'
 
-function App() {
-  const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [veterinaria, setVeterinaria] = useState('')
-  const [pagina, setPagina] = useState<'dashboard' | 'duenos'>('dashboard')
+function SessionScreen({ message, children }: { message: string; children?: ReactNode }) {
+  return (
+    <main className="loading-screen">
+      <div className="loading-logo" aria-hidden="true">V</div>
+      <h1>VetTrack</h1>
+      <p role="status">{message}</p>
+      {children}
+    </main>
+  )
+}
 
-  // Controlar la sesión del usuario
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoading(false)
-    })
+function LogoutButton() {
+  const [error, setError] = useState('')
+  const [pending, setPending] = useState(false)
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession)
-    })
-
-    return () => {
-      subscription.unsubscribe()
+  const logout = async () => {
+    if (pending) return
+    setPending(true)
+    setError('')
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+    } catch {
+      setError('No se pudo cerrar la sesión. Intenta de nuevo.')
+    } finally {
+      setPending(false)
     }
-  }, [])
-
-  // Obtener la veterinaria del usuario autenticado
-  useEffect(() => {
-    const cargarVeterinaria = async () => {
-      if (!session?.user?.id) {
-        setVeterinaria('')
-        return
-      }
-
-      const { data: perfil, error: perfilError } = await supabase
-        .from('perfilusuario')
-        .select('id_veterinaria')
-        .eq('id', session.user.id)
-        .single()
-
-      if (perfilError) {
-        console.error('Error al obtener perfil:', perfilError)
-        return
-      }
-
-      if (!perfil?.id_veterinaria) {
-        console.error('El usuario no tiene una veterinaria asignada.')
-        return
-      }
-
-      const { data: vet, error: vetError } = await supabase
-        .from('veterinaria')
-        .select('nombre')
-        .eq('id_veterinaria', perfil.id_veterinaria)
-        .single()
-
-      if (vetError) {
-        console.error('Error al obtener veterinaria:', vetError)
-        return
-      }
-
-      setVeterinaria(vet.nombre)
-    }
-
-    cargarVeterinaria()
-  }, [session])
-
-  if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-logo">V</div>
-        <h2>VetTrack</h2>
-        <p>Cargando sistema...</p>
-      </div>
-    )
   }
 
-  if (!session) {
-    return <Login onLogin={() => {}} />
-  }
+  return (
+    <>
+      <button type="button" className="nav-item logout" onClick={logout} disabled={pending}>
+        <span aria-hidden="true">←</span>
+        <span className="nav-label">{pending ? 'Cerrando sesión…' : 'Cerrar sesión'}</span>
+      </button>
+      {error && <p className="logout-error" role="alert">{error}</p>}
+    </>
+  )
+}
+
+function Workspace({ session, clinic, title, navigation, children }: {
+  session: Session
+  clinic?: string
+  title: string
+  navigation: ReactNode
+  children: ReactNode
+}) {
+  const email = session.user.email || 'Sin correo electrónico'
 
   return (
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-icon">V</div>
-
-          <div>
-            <h1>VetTrack</h1>
-            <span>Gestion veterinaria</span>
-          </div>
+          <div className="brand-icon" aria-hidden="true">V</div>
+          <div><h1>VetTrack</h1><span>Gestión veterinaria</span></div>
         </div>
-
-        <nav className="navigation">
-          <button
-            className={`nav-item ${pagina === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setPagina('dashboard')}
-          >
-            <span>▦</span>
-            Dashboard
-          </button>
-
-         <button
-            className={`nav-item ${pagina === 'duenos' ? 'active' : ''}`}
-            onClick={() => setPagina('duenos')}
-          >
-            <span>♙</span>
-            Dueños
-          </button>
-
-          <button className="nav-item">
-            <span>🐾</span>
-            Mascotas
-          </button>
-
-          <button className="nav-item">
-            <span>▣</span>
-            Citas
-          </button>
-
-          <button className="nav-item">
-            <span>✚</span>
-            Diagnosticos
-          </button>
-
-          <div className="nav-section">
-            Administracion
-          </div>
-
-          <button className="nav-item">
-            <span>◆</span>
-            Servicios
-          </button>
-
-          <button className="nav-item">
-            <span>□</span>
-            Productos
-          </button>
-
-          <button className="nav-item">
-            <span>$</span>
-            Pagos
-          </button>
-
-          <button className="nav-item">
-            <span>⚙</span>
-            Configuracion
-          </button>
-        </nav>
-
-        <div className="sidebar-bottom">
-          <button
-            className="nav-item logout"
-            onClick={() => supabase.auth.signOut()}
-          >
-            <span>←</span>
-            Cerrar sesion
-          </button>
-        </div>
+        <nav className="navigation" aria-label="Navegación principal">{navigation}</nav>
+        <div className="sidebar-bottom"><LogoutButton /></div>
       </aside>
-
       <main className="main-content">
         <header className="topbar">
           <div>
-            <span className="breadcrumb">VetTrack / Dashboard</span>
-            <h2>Dashboard</h2>
+            <span className="breadcrumb">VetTrack / {title}</span>
+            <h2>{title}</h2>
           </div>
-
           <div className="user-area">
             <div className="clinic">
-              <span className="clinic-label">Clinica actual</span>
-              <strong>{veterinaria || 'Cargando...'}</strong>
+              <span className="clinic-label">{clinic ? 'Clínica actual' : 'Administración'}</span>
+              <strong>{clinic || 'Todas las veterinarias'}</strong>
             </div>
-
-            <div className="user-avatar">
-              VG
-            </div>
-
+            <div className="user-avatar" aria-hidden="true">{email.charAt(0).toUpperCase()}</div>
             <div className="user-info">
-              <strong>Administrador</strong>
-              <span>admin@vettrack.test</span>
+              <strong>{clinic ? 'Usuario de clínica' : 'Superadministrador'}</strong>
+              <span>{email}</span>
             </div>
           </div>
         </header>
-
-        <section className="content">
-        {pagina === 'duenos' ? (
-          <Duenos />
-        ) : (
-          <>
-            <div className="welcome">
-            <div>
-              <span className="eyebrow">Panel principal</span>
-              <h3>Bienvenido a VetTrack</h3>
-              <p>
-                Administra los pacientes, duenos, citas y servicios
-                de tu clinica veterinaria.
-              </p>
-            </div>
-
-            <button className="primary-button">
-              + Nueva cita
-            </button>
-          </div>
-
-          <section className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-icon">♙</div>
-              <div>
-                <span>Dueños</span>
-                <strong>3</strong>
-                <small>Registrados en la clinica</small>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon">🐾</div>
-              <div>
-                <span>Mascotas</span>
-                <strong>3</strong>
-                <small>Pacientes registrados</small>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon">▣</div>
-              <div>
-                <span>Citas</span>
-                <strong>1</strong>
-                <small>Citas registradas</small>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon">✚</div>
-              <div>
-                <span>Diagnosticos</span>
-                <strong>1</strong>
-                <small>Registros medicos</small>
-              </div>
-            </div>
-          </section>
-
-          <section className="dashboard-grid">
-            <div className="panel">
-              <div className="panel-header">
-                <div>
-                  <span className="eyebrow">Agenda</span>
-                  <h3>Proximas citas</h3>
-                </div>
-
-                <button className="text-button">
-                  Ver todas
-                </button>
-              </div>
-
-              <div className="appointments">
-                <div className="appointment">
-                  <div className="appointment-time">
-                    <strong>10:00</strong>
-                    <span>Hoy</span>
-                  </div>
-
-                  <div className="appointment-info">
-                    <strong>Pepito</strong>
-                    <span>Consulta veterinaria</span>
-                  </div>
-
-                  <span className="status confirmed">
-                    Confirmada
-                  </span>
-                </div>
-
-                <div className="appointment">
-                  <div className="appointment-time">
-                    <strong>11:30</strong>
-                    <span>Hoy</span>
-                  </div>
-
-                  <div className="appointment-info">
-                    <strong>Marvin</strong>
-                    <span>Revision general</span>
-                  </div>
-
-                  <span className="status pending">
-                    Pendiente
-                  </span>
-                </div>
-
-                <div className="appointment">
-                  <div className="appointment-time">
-                    <strong>13:00</strong>
-                    <span>Mañana</span>
-                  </div>
-
-                  <div className="appointment-info">
-                    <strong>Panchito</strong>
-                    <span>Baño de mascotas</span>
-                  </div>
-
-                  <span className="status confirmed">
-                    Confirmada
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="panel-header">
-                <div>
-                  <span className="eyebrow">Actividad</span>
-                  <h3>Actividad reciente</h3>
-                </div>
-              </div>
-
-              <div className="activity-list">
-                <div className="activity">
-                  <div className="activity-icon">🐾</div>
-
-                  <div>
-                    <strong>Nuevo paciente registrado</strong>
-                    <span>Pepito fue agregado al sistema</span>
-                    <small>Hace 2 horas</small>
-                  </div>
-                </div>
-
-                <div className="activity">
-                  <div className="activity-icon">✚</div>
-
-                  <div>
-                    <strong>Diagnostico registrado</strong>
-                    <span>Se agrego un diagnostico para Pepito</span>
-                    <small>Ayer</small>
-                  </div>
-                </div>
-
-                <div className="activity">
-                  <div className="activity-icon">▣</div>
-
-                  <div>
-                    <strong>Cita confirmada</strong>
-                    <span>Consulta veterinaria</span>
-                    <small>Ayer</small>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="tenant-banner">
-            <div className="tenant-icon">V</div>
-
-            <div>
-              <span>Tenant actual</span>
-              <strong>{veterinaria || 'Cargando...'}</strong>
-              <p>
-                Los datos mostrados pertenecen exclusivamente a
-                esta clinica.
-              </p>
-            </div>
-
-            <div className="tenant-status">
-              <span></span>
-              Multi-Tenant activo
-            </div>
-          </section>
-
-        </>
-      )}
-      </section>
-    </main>
+        <section className="content">{children}</section>
+      </main>
     </div>
   )
+}
+
+function ClinicWorkspace({ session }: { session: Session }) {
+  const [clinic, setClinic] = useState<{ id: string; nombre: string } | null>(null)
+  const [error, setError] = useState('')
+  const [pagina, setPagina] = useState<Pagina>('dashboard')
+  const userId = session.user.id
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    const loadClinic = async () => {
+      try {
+        const { data: perfil, error: perfilError } = await supabase
+          .from('perfilusuario')
+          .select('id_veterinaria')
+          .eq('id', userId)
+          .abortSignal(controller.signal)
+          .single()
+
+        if (controller.signal.aborted) return
+        if (perfilError || !perfil?.id_veterinaria) {
+          throw new Error('Tu cuenta no tiene un perfil de clínica disponible. Solicita al administrador que revise tu acceso.')
+        }
+
+        const { data: vet, error: vetError } = await supabase
+          .from('veterinaria')
+          .select('id_veterinaria, nombre')
+          .eq('id_veterinaria', perfil.id_veterinaria)
+          .abortSignal(controller.signal)
+          .single()
+
+        if (controller.signal.aborted) return
+        if (vetError || !vet?.nombre) {
+          throw new Error('No se pudo obtener la clínica asignada. Solicita al administrador que revise tu acceso.')
+        }
+        setClinic({ id: vet.id_veterinaria, nombre: vet.nombre })
+      } catch (cause) {
+        if (!controller.signal.aborted) {
+          setError(cause instanceof Error ? cause.message : 'No se pudo cargar la clínica asignada.')
+        }
+      }
+    }
+
+    void loadClinic()
+    return () => controller.abort()
+  }, [userId])
+
+  if (error) return <SessionScreen message={error}><div className="session-actions"><LogoutButton /></div></SessionScreen>
+  if (!clinic) return <SessionScreen message="Cargando tu clínica…" />
+
+  return (
+    <Workspace session={session} clinic={clinic.nombre} title={pagina === 'duenos' ? 'Dueños' : 'Dashboard'} navigation={
+      <>
+        <button type="button" className={`nav-item ${pagina === 'dashboard' ? 'active' : ''}`} aria-current={pagina === 'dashboard' ? 'page' : undefined} onClick={() => setPagina('dashboard')}>
+          <span aria-hidden="true">▦</span><span className="nav-label">Dashboard</span>
+        </button>
+        <button type="button" className={`nav-item ${pagina === 'duenos' ? 'active' : ''}`} aria-current={pagina === 'duenos' ? 'page' : undefined} onClick={() => setPagina('duenos')}>
+          <span aria-hidden="true">♙</span><span className="nav-label">Dueños</span>
+        </button>
+        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">♧</span><span className="nav-label">Mascotas</span></button>
+        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">▣</span><span className="nav-label">Citas</span></button>
+        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">✚</span><span className="nav-label">Diagnósticos</span></button>
+        <div className="nav-section">Administración</div>
+        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">◆</span><span className="nav-label">Servicios</span></button>
+        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">□</span><span className="nav-label">Productos</span></button>
+        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">$</span><span className="nav-label">Pagos</span></button>
+        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">⚙</span><span className="nav-label">Configuración</span></button>
+      </>
+    }>
+      {pagina === 'duenos' ? <Duenos /> : <Dashboard clinicId={clinic.id} clinicName={clinic.nombre} />}
+    </Workspace>
+  )
+}
+
+function App() {
+  const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    let authEventReceived = false
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      authEventReceived = true
+      if (active) {
+        setSession(nextSession)
+        setError('')
+        setLoading(false)
+      }
+    })
+
+    supabase.auth.getSession().then(({ data, error: sessionError }) => {
+      if (!active || authEventReceived) return
+      if (sessionError) setError('No se pudo recuperar la sesión. Recarga la página para intentar de nuevo.')
+      setSession(sessionError ? null : data.session)
+      setLoading(false)
+    }).catch(() => {
+      if (!active || authEventReceived) return
+      setError('No se pudo recuperar la sesión. Recarga la página para intentar de nuevo.')
+      setLoading(false)
+    })
+
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  if (loading) return <SessionScreen message="Cargando sistema…" />
+  if (error) return <SessionScreen message={error}><button type="button" className="primary-button" onClick={() => window.location.reload()}>Reintentar</button></SessionScreen>
+  if (!session) return <Login onLogin={() => {}} />
+
+  if (session.user.app_metadata.super_admin === true) {
+    return (
+      <Workspace key={`${session.user.id}:global`} session={session} title="Veterinarias" navigation={
+        <button type="button" className="nav-item active" aria-current="page"><span aria-hidden="true">▦</span><span className="nav-label">Veterinarias</span></button>
+      }>
+        <Tenants />
+      </Workspace>
+    )
+  }
+
+  return <ClinicWorkspace key={`${session.user.id}:clinic`} session={session} />
 }
 
 export default App

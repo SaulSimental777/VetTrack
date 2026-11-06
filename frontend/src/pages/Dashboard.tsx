@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const metrics = [
-  { table: 'dueno', label: 'Dueños', icon: '♙', detail: 'Registrados en la clínica' },
-  { table: 'mascota', label: 'Mascotas', icon: '♧', detail: 'Pacientes registrados' },
+  { table: 'dueno', label: 'Propietarios', icon: '♙', detail: 'Registrados en la clínica' },
+  { table: 'mascota', label: 'Pacientes', icon: '♧', detail: 'Pacientes registrados' },
   { table: 'cita', label: 'Citas', icon: '▣', detail: 'Citas registradas' },
   { table: 'diagnostico', label: 'Diagnósticos', icon: '✚', detail: 'Registros médicos' },
 ] as const
@@ -40,7 +40,7 @@ function Dashboard({ clinicId, clinicName }: { clinicId: string; clinicName: str
         <div>
           <span className="eyebrow">Panel principal</span>
           <h3>Bienvenido a VetTrack</h3>
-          <p>Administra los pacientes, dueños, citas y servicios de {clinicName}.</p>
+          <p>Administra los pacientes, propietarios, citas y servicios de {clinicName}.</p>
         </div>
       </div>
       {failed && <p className="dashboard-error" role="alert">No se pudieron cargar algunas estadísticas. Los valores no disponibles se muestran como —.</p>}

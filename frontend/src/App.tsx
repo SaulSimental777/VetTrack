@@ -4,11 +4,12 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import Login from './pages/login'
 import Duenos from './pages/Duenos'
+import Pacientes from './pages/Pacientes'
 import Tenants from './pages/Tenants'
 import Dashboard from './pages/Dashboard'
 import './App.css'
 
-type Pagina = 'dashboard' | 'duenos'
+type Pagina = 'dashboard' | 'duenos' | 'pacientes'
 
 function SessionScreen({ message, children }: { message: string; children?: ReactNode }) {
   return (
@@ -143,15 +144,15 @@ function ClinicWorkspace({ session }: { session: Session }) {
   if (!clinic) return <SessionScreen message="Cargando tu clínica…" />
 
   return (
-    <Workspace session={session} clinic={clinic.nombre} title={pagina === 'duenos' ? 'Dueños' : 'Dashboard'} navigation={
+    <Workspace session={session} clinic={clinic.nombre} title={pagina === 'duenos' ? 'Propietarios' : pagina === 'pacientes' ? 'Pacientes' : 'Dashboard'} navigation={
       <>
         <button type="button" className={`nav-item ${pagina === 'dashboard' ? 'active' : ''}`} aria-current={pagina === 'dashboard' ? 'page' : undefined} onClick={() => setPagina('dashboard')}>
           <span aria-hidden="true">▦</span><span className="nav-label">Dashboard</span>
         </button>
         <button type="button" className={`nav-item ${pagina === 'duenos' ? 'active' : ''}`} aria-current={pagina === 'duenos' ? 'page' : undefined} onClick={() => setPagina('duenos')}>
-          <span aria-hidden="true">♙</span><span className="nav-label">Dueños</span>
+          <span aria-hidden="true">♙</span><span className="nav-label">Propietarios</span>
         </button>
-        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">♧</span><span className="nav-label">Mascotas</span></button>
+        <button type="button" className={`nav-item ${pagina === 'pacientes' ? 'active' : ''}`} aria-current={pagina === 'pacientes' ? 'page' : undefined} onClick={() => setPagina('pacientes')}><span aria-hidden="true">♧</span><span className="nav-label">Pacientes</span></button>
         <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">▣</span><span className="nav-label">Citas</span></button>
         <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">✚</span><span className="nav-label">Diagnósticos</span></button>
         <div className="nav-section">Administración</div>
@@ -161,7 +162,7 @@ function ClinicWorkspace({ session }: { session: Session }) {
         <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">⚙</span><span className="nav-label">Configuración</span></button>
       </>
     }>
-      {pagina === 'duenos' ? <Duenos /> : <Dashboard clinicId={clinic.id} clinicName={clinic.nombre} />}
+      {pagina === 'duenos' ? <Duenos /> : pagina === 'pacientes' ? <Pacientes /> : <Dashboard clinicId={clinic.id} clinicName={clinic.nombre} />}
     </Workspace>
   )
 }

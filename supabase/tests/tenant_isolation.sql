@@ -1,6 +1,6 @@
--- PREPARED, NOT EXECUTED during Phase 0.
+-- Phase 1 updates: PREPARED, NOT EXECUTED against Supabase.
 -- Review before running on the approved project yugbrcyrztwksiewzuvy.
--- Requires the real schema and 20261104_security_hardening.sql already applied.
+-- Requires the real schema, Phase 0 and 20261106_patients_module.sql applied.
 -- Run as postgres in a dedicated session with psql ON_ERROR_STOP enabled.
 -- Every fixture and successful test write is discarded by the final ROLLBACK.
 BEGIN;
@@ -84,6 +84,7 @@ DECLARE
     inserted_owner uuid;
     readonly_table record;
     visible_count integer;
+    inserted_patient uuid;
 BEGIN
     IF public.get_my_veterinaria() IS DISTINCT FROM current_setting('vettrack.test.tenant_a')::uuid THEN
         RAISE EXCEPTION 'Tenant lookup failed for user A';
@@ -115,6 +116,8 @@ BEGIN
         INTO visible_count USING current_setting('vettrack.test.' || readonly_table.foreign_setting)::uuid;
         IF visible_count <> 0 THEN RAISE EXCEPTION 'Foreign SELECT succeeded on % for tenant A', readonly_table.table_name; END IF;
 
+        -- Patients now have CRUD; appointments and diagnoses remain read-only.
+        IF readonly_table.table_name = 'mascota' THEN CONTINUE; END IF;
         -- These modules have no write privileges even for the user's own rows.
         -- A zero-row INSERT still requires INSERT, without needing extra fixtures.
         BEGIN
@@ -138,6 +141,61 @@ BEGIN
     END LOOP;
     -- The catalog must remain readable, even if it currently has no rows.
     PERFORM 1 FROM public.metododepago;
+
+    -- Own patient CRUD is allowed; do not populate or change historical edad.
+    INSERT INTO public.mascota (nombre, id_dueno, especie, sexo, fecha_nacimiento, peso_actual)
+    VALUES ('Own patient', current_setting('vettrack.test.owner_a')::uuid, 'Gato', 'Hembra', date '2020-02-29', 3.5)
+    RETURNING id_mascota INTO inserted_patient;
+    IF NOT EXISTS (SELECT 1 FROM public.mascota WHERE id_mascota = inserted_patient) THEN
+        RAISE EXCEPTION 'Own patient INSERT/SELECT failed';
+    END IF;
+    UPDATE public.mascota SET nombre = 'Own patient updated' WHERE id_mascota = inserted_patient;
+    GET DIAGNOSTICS affected_rows = ROW_COUNT;
+    IF affected_rows <> 1 THEN RAISE EXCEPTION 'Own patient UPDATE failed'; END IF;
+    BEGIN
+        INSERT INTO public.mascota (nombre, id_dueno)
+        VALUES ('Foreign patient', current_setting('vettrack.test.owner_b')::uuid);
+        RAISE EXCEPTION 'Patient INSERT under foreign owner succeeded';
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+    BEGIN
+        UPDATE public.mascota SET id_dueno = current_setting('vettrack.test.owner_b')::uuid
+        WHERE id_mascota = inserted_patient;
+        RAISE EXCEPTION 'Patient reassignment to foreign owner succeeded';
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+    UPDATE public.mascota SET nombre = 'Foreign update'
+    WHERE id_mascota = current_setting('vettrack.test.patient_b')::uuid;
+    GET DIAGNOSTICS affected_rows = ROW_COUNT;
+    IF affected_rows <> 0 THEN RAISE EXCEPTION 'Foreign patient UPDATE succeeded'; END IF;
+    DELETE FROM public.mascota WHERE id_mascota = current_setting('vettrack.test.patient_b')::uuid;
+    GET DIAGNOSTICS affected_rows = ROW_COUNT;
+    IF affected_rows <> 0 THEN RAISE EXCEPTION 'Foreign patient DELETE succeeded'; END IF;
+
+    -- A visible owner in the same tenant is a valid reassignment target.
+    INSERT INTO public.dueno (nombre, id_veterinaria)
+    VALUES ('Second own owner', current_setting('vettrack.test.tenant_a')::uuid)
+    RETURNING id_dueno INTO inserted_owner;
+    UPDATE public.mascota SET id_dueno = inserted_owner WHERE id_mascota = inserted_patient;
+    GET DIAGNOSTICS affected_rows = ROW_COUNT;
+    IF affected_rows <> 1 THEN RAISE EXCEPTION 'Same-tenant patient reassignment failed'; END IF;
+    DELETE FROM public.mascota WHERE id_mascota = inserted_patient;
+    GET DIAGNOSTICS affected_rows = ROW_COUNT;
+    IF affected_rows <> 1 THEN RAISE EXCEPTION 'Own patient DELETE failed'; END IF;
+    DELETE FROM public.dueno WHERE id_dueno = inserted_owner;
+
+    -- Dependencies must block deletion instead of CASCADE or SET NULL.
+    BEGIN
+        DELETE FROM public.mascota WHERE id_mascota = current_setting('vettrack.test.patient_a')::uuid;
+        RAISE EXCEPTION 'Patient with clinical dependencies was deleted';
+    EXCEPTION WHEN foreign_key_violation THEN NULL;
+    END;
+    IF NOT EXISTS (SELECT 1 FROM public.cita WHERE id_cita = current_setting('vettrack.test.appointment_a')::uuid
+                   AND id_mascota = current_setting('vettrack.test.patient_a')::uuid)
+       OR NOT EXISTS (SELECT 1 FROM public.diagnostico WHERE id_diagnostico = current_setting('vettrack.test.diagnosis_a')::uuid
+                      AND id_mascota = current_setting('vettrack.test.patient_a')::uuid) THEN
+        RAISE EXCEPTION 'Patient dependencies were modified by deletion';
+    END IF;
 
     UPDATE public.dueno SET nombre = 'Foreign update' WHERE id_dueno = current_setting('vettrack.test.owner_b')::uuid;
     GET DIAGNOSTICS affected_rows = ROW_COUNT;
@@ -269,7 +327,7 @@ BEGIN
         END LOOP;
     END LOOP;
 
-    -- dueno retains CRUD; every other module is read-only or closed.
+    -- dueno and mascota retain CRUD; every other module is read-only or closed.
     FOREACH privilege_name IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE'] LOOP
         IF NOT has_table_privilege('authenticated', 'public.dueno', privilege_name) THEN
             RAISE EXCEPTION 'authenticated lost % on dueno', privilege_name;
@@ -282,12 +340,16 @@ BEGIN
     ] LOOP
         FOREACH privilege_name IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'TRIGGER', 'REFERENCES'] LOOP
             IF has_table_privilege('authenticated', format('public.%I', table_name), privilege_name)
-               IS DISTINCT FROM (table_name IN ('mascota', 'cita', 'diagnostico', 'metododepago') AND privilege_name = 'SELECT') THEN
+               IS DISTINCT FROM (
+                   (table_name = 'mascota' AND privilege_name IN ('SELECT', 'INSERT', 'UPDATE', 'DELETE'))
+                   OR (table_name IN ('cita', 'diagnostico', 'metododepago') AND privilege_name = 'SELECT')
+               ) THEN
                 RAISE EXCEPTION 'Unexpected authenticated privilege % on %', privilege_name, table_name;
             END IF;
         END LOOP;
         FOREACH privilege_name IN ARRAY ARRAY['INSERT', 'UPDATE', 'REFERENCES'] LOOP
-            IF has_any_column_privilege('authenticated', format('public.%I', table_name), privilege_name) THEN
+            IF has_any_column_privilege('authenticated', format('public.%I', table_name), privilege_name)
+               AND NOT (table_name = 'mascota' AND privilege_name IN ('INSERT', 'UPDATE')) THEN
                 RAISE EXCEPTION 'Unexpected authenticated column privilege % on %', privilege_name, table_name;
             END IF;
         END LOOP;
@@ -296,6 +358,12 @@ BEGIN
             RAISE EXCEPTION 'Closed table % still has column SELECT', table_name;
         END IF;
     END LOOP;
+
+    IF EXISTS (SELECT 1 FROM pg_catalog.pg_constraint
+               WHERE contype = 'f' AND confrelid = 'public.mascota'::regclass
+                 AND confdeltype NOT IN ('a', 'r')) THEN
+        RAISE EXCEPTION 'A patient dependency still permits destructive delete propagation';
+    END IF;
 
     FOR registration_function IN
         SELECT p.oid FROM pg_catalog.pg_proc AS p

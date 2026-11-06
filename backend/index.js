@@ -5,6 +5,7 @@ const cors = require('cors')
 
 const duenosRoutes = require('./routes/duenos.routes')
 const tenantsRoutes = require('./routes/tenants.routes')
+const pacientesRoutes = require('./routes/pacientes.routes')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -32,6 +33,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/duenos', duenosRoutes)
 app.use('/api/tenants', tenantsRoutes)
+app.use('/api/pacientes', pacientesRoutes)
 
 if (require.main === module) {
   app.listen(PORT, () => {

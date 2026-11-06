@@ -45,7 +45,7 @@ const cargarDuenos = async () => {
     )
 
     setError(
-      'No se pudieron cargar los dueños.'
+      'No se pudieron cargar los propietarios.'
     )
   } finally {
     setLoading(false)
@@ -61,7 +61,7 @@ const cargarDuenos = async () => {
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setError('No se pudieron cargar los dueños.')
+          setError('No se pudieron cargar los propietarios.')
         }
       })
       .finally(() => {
@@ -124,7 +124,7 @@ const cargarDuenos = async () => {
 
   if (!nombre.trim()) {
     setError(
-      'El nombre del dueño es obligatorio.'
+      'El nombre del propietario es obligatorio.'
     )
     return
   }
@@ -170,7 +170,7 @@ const cargarDuenos = async () => {
     setError(
       error instanceof Error
         ? error.message
-        : 'No se pudo guardar el dueño.'
+        : 'No se pudo guardar el propietario.'
     )
   } finally {
     setGuardando(false)
@@ -203,7 +203,7 @@ const eliminarDueno = async () => {
     setError(
       error instanceof Error
         ? error.message
-        : 'No se pudo eliminar el dueño.'
+        : 'No se pudo eliminar el propietario.'
     )
   } finally {
     setEliminando(false)
@@ -214,8 +214,8 @@ const eliminarDueno = async () => {
     <div className="duenos-page">
       <div className="duenos-header">
         <div>
-          <span className="eyebrow">Pacientes / Dueños</span>
-          <h3>Dueños</h3>
+          <span className="eyebrow">Clínica / Propietarios</span>
+          <h3>Propietarios</h3>
           <p>
             Administra los propietarios registrados en tu clínica.
           </p>
@@ -225,21 +225,21 @@ const eliminarDueno = async () => {
           className="primary-button"
           onClick={abrirModal}
         >
-          + Nuevo dueño
+          + Nuevo propietario
         </button>
       </div>
 
       <div className="duenos-card">
         <div className="duenos-card-header">
           <div>
-            <strong>Dueños registrados</strong>
+            <strong>Propietarios registrados</strong>
             <span>{duenos.length} registros</span>
           </div>
 
              <input
                 className="duenos-search"
                 type="text"
-                placeholder="Buscar dueño..."
+                placeholder="Buscar propietario..."
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
                 />
@@ -247,7 +247,7 @@ const eliminarDueno = async () => {
 
         {loading && (
           <div className="duenos-message">
-            Cargando dueños...
+            Cargando propietarios...
           </div>
         )}
 
@@ -261,7 +261,7 @@ const eliminarDueno = async () => {
           <div className="duenos-empty">
             <div className="duenos-empty-icon">♙</div>
 
-            <h4>No hay dueños registrados</h4>
+            <h4>No hay propietarios registrados</h4>
 
             <p>
               Esta clínica todavía no tiene propietarios registrados.
@@ -271,7 +271,7 @@ const eliminarDueno = async () => {
               className="primary-button"
               onClick={abrirModal}
             >
-              + Registrar primer dueño
+              + Registrar primer propietario
             </button>
           </div>
         )}
@@ -337,7 +337,7 @@ const eliminarDueno = async () => {
                 </span>
 
                 <h3>
-                    {duenoEditando ? 'Editar dueño' : 'Registrar dueño'}
+                    {duenoEditando ? 'Editar propietario' : 'Registrar propietario'}
                 </h3>
               </div>
 
@@ -426,7 +426,7 @@ const eliminarDueno = async () => {
                     ? 'Guardando...'
                     : duenoEditando
                         ? 'Guardar cambios'
-                        : 'Guardar dueño'}
+                        : 'Guardar propietario'}
                 </button>
               </div>
                       </form>
@@ -443,7 +443,7 @@ const eliminarDueno = async () => {
             !
           </div>
 
-          <h3>Eliminar dueño</h3>
+          <h3>Eliminar propietario</h3>
 
           <p>
             ¿Estás seguro de que deseas eliminar a

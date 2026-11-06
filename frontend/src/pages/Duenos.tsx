@@ -134,9 +134,9 @@ const cargarDuenos = async () => {
 
   const datosDueno = {
     nombre: nombre.trim(),
-    telefono: telefono.trim() || null,
-    correo: correo.trim() || null,
-    direccion: direccion.trim() || null,
+    telefono: telefono.trim(),
+    correo: correo.trim(),
+    direccion: direccion.trim(),
   }
 
   try {

@@ -92,7 +92,7 @@ DO $$ DECLARE a jsonb; BEGIN
  a:=public.vettrack_guardar_cita(NULL,jsonb_build_object('id_mascota',pg_temp.id('patient'),'id_dueno',pg_temp.id('owner'),
   'id_medico',pg_temp.id('med_plain'),'fecha_inicio','2030-01-07T10:00:00-08:00','servicios',jsonb_build_array(pg_temp.id('legacy_service'))));
  PERFORM set_config('vettrack.clinic.clinical_appointment_group_i',a->>'id_cita',true);
- PERFORM pg_temp.assert_true((SELECT count(*) FROM public.permiso)=69,'Phase 4 permission catalog');
+ PERFORM pg_temp.assert_true((SELECT count(*) FROM public.permiso)=CASE WHEN to_regprocedure('public.vettrack_inventario(text,jsonb)') IS NOT NULL THEN 82 ELSE 69 END,'Phase 4 permission catalog');
 END $$;
 RESET ROLE;
 

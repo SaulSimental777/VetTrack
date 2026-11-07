@@ -90,6 +90,13 @@ test('multi-medication prescriptions are inventory-independent and do not move s
   assert.equal(state.calls.length, 1)
   assert.equal((await request(`/consultas/${id(3)}/registros/receta`, 'POST', { detalles: [medication('unknown')] })).status, 400)
 })
+test('prescription supports optional product UUID while all stock changes stay separate', async () => {
+  plan('vettrack_guardar_registro_clinico', {}, args => assert.equal(args.p_datos.detalles[0].id_producto, id(25)))
+  assert.equal((await request(`/consultas/${id(3)}/registros/receta`, 'POST', { detalles: [{ ...medication(), id_producto: id(25) }] })).status, 200)
+  assert.equal((await request(`/consultas/${id(3)}/registros/receta`, 'POST', { detalles: [{ ...medication(), id_producto: 'invalid' }] })).status, 400)
+  assert.equal(state.calls.length, 1)
+})
+
 test('professional license, additional services and reopening are bounded and tenant-free', async () => {
   assert.equal((await request(`/medicos/${id(1)}/cedula`, 'PUT', { cedula_profesional: 'bad' })).status, 400)
   plan('vettrack_cedula_medico', {}, args => assert.deepEqual(args, { p_medico: id(1), p_cedula: '12345678' }))

@@ -19,6 +19,7 @@ const Citas = lazy(() => import('./pages/Citas'))
 const Clinica = lazy(() => import('./pages/Clinica'))
 const Expediente = lazy(() => import('./pages/Expediente'))
 const OrdenesRecepcion = lazy(() => import('./pages/OrdenesRecepcion'))
+const Inventario = lazy(() => import('./pages/Inventario'))
 
 const clinicRoutes = [
   { path: '/dashboard', title: 'Dashboard', permission: 'dashboard.ver', icon: '▦' },
@@ -30,6 +31,9 @@ const clinicRoutes = [
   { path: '/ordenes-recepcion', title: 'Órdenes de recepción', permission: 'orden_recepcion.ver', icon: '▧' },
   { path: '/medicos', title: 'Médicos', permission: 'medicos.ver', icon: '✚' },
   { path: '/servicios', title: 'Servicios', permission: 'servicios.ver', icon: '◆' },
+  { path: '/inventario', title: 'Inventario', permission: 'inventario.ver', icon: '□' },
+  { path: '/proveedores', title: 'Proveedores', permission: 'proveedores.ver', icon: '◇' },
+  { path: '/compras', title: 'Compras', permission: 'compras.ver', icon: '▤' },
   { path: '/configuracion/usuarios', title: 'Usuarios', permission: 'usuarios.ver', icon: '⚙' },
 ] as const
 
@@ -185,7 +189,7 @@ function ClinicWorkspace({ session }: { session: Session }) {
           </button>
         </div>)}
         {[
-          ['inventario.ver', 'Inventario', '□'], ['pagos.ver', 'Pagos', '$'],
+          ['pagos.ver', 'Pagos', '$'],
         ].filter(([permission]) => can(permission)).map(([permission, label, icon]) => <button key={permission} type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">{icon}</span><span className="nav-label">{label}</span></button>)}
       </>
     }>
@@ -201,6 +205,9 @@ function ClinicWorkspace({ session }: { session: Session }) {
           : path === '/clinica' ? <Clinica />
           : path === '/expediente' ? <Expediente />
           : path === '/ordenes-recepcion' ? <OrdenesRecepcion />
+          : path === '/inventario' ? <Inventario />
+          : path === '/proveedores' ? <Inventario module="proveedores" />
+          : path === '/compras' ? <Inventario module="compras" />
           : <Dashboard clinicId={access.id_veterinaria} clinicName={access.nombre_veterinaria} />}
         </Suspense>
       </div>

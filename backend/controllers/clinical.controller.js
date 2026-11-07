@@ -30,13 +30,14 @@ const recordBody = (kind, body) => {
     if (!Array.isArray(body.detalles) || body.detalles.length < 1 || body.detalles.length > 50) fallar(400, 'Selecciona de uno a cincuenta medicamentos.')
     return { indicaciones: texto(body.indicaciones, 'Las indicaciones', 20000), detalles: body.detalles.map(item => {
       const fields = ['nombre_medicamento', 'principio_activo', 'concentracion', 'presentacion', 'dosis', 'frecuencia', 'duracion', 'via_administracion', 'cantidad', 'indicaciones', 'grupo_prescripcion', 'tiempo_retiro', 'entregar']
-      validarCampos(item, fields)
+      validarCampos(item, [...fields, 'id_producto'])
       const data = Object.fromEntries(fields.filter(key => !['cantidad', 'entregar'].includes(key)).map(key => [key, texto(item[key], key.replaceAll('_', ' '), 5000, ['nombre_medicamento', 'dosis', 'frecuencia', 'duracion', 'via_administracion'].includes(key))]))
       data.grupo_prescripcion = item.grupo_prescripcion || 'no_clasificado'
       if (!['I', 'II', 'III', 'no_clasificado'].includes(data.grupo_prescripcion)) fallar(400, 'Grupo de prescripción no válido.')
       data.cantidad = number(item.cantidad, 999999999)
       if (data.cantidad == null) fallar(400, 'Cantidad requerida.')
       data.entregar = booleano(item.entregar, false)
+      if (item.id_producto != null) data.id_producto = validarId(item.id_producto)
       return data
     }) }
   }

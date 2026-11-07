@@ -353,6 +353,9 @@ BEGIN
         operational_tables := operational_tables || ARRAY['consulta','tratamiento','receta_detalle','vacunacion','desparasitacion','estudio_clinico','orden_recepcion','documento_clinico'];
         read_only_tables := read_only_tables || ARRAY['consulta','tratamiento','receta','receta_detalle','vacunacion','desparasitacion','estudio_clinico','orden_recepcion'];
     END IF;
+    IF to_regprocedure('public.vettrack_inventario(text,jsonb)') IS NOT NULL THEN
+        operational_tables := operational_tables || ARRAY['proveedor','compra','compra_detalle','venta_preparada','venta_preparada_detalle','movimiento_inventario'];
+    END IF;
     FOREACH table_name IN ARRAY ARRAY[
         'dueno', 'mascota', 'cita', 'diagnostico', 'historialmedico', 'receta',
         'producto', 'servicio', 'pago', 'experto', 'promocion', 'ubicacion',

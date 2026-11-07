@@ -48,6 +48,7 @@ app.use('/api/medicos', medicosRoutes)
 app.use('/api/servicios', serviciosRoutes)
 app.use('/api/citas', citasRoutes)
 app.use('/api/clinica', clinicalRoutes)
+app.use('/api/inventario', require('./routes/inventory.routes'))
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error)
   if (error.type === 'entity.too.large') return res.status(413).json({ error: 'Los datos enviados superan el tamaño permitido.' })

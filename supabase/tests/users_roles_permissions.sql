@@ -118,7 +118,12 @@ BEGIN
             'vacunas.ver','vacunas.crear','vacunas.editar','desparasitacion.ver','desparasitacion.crear','desparasitacion.editar',
             'estudios.ver','estudios.crear','estudios.editar','orden_recepcion.ver'];
     END IF;
-    PERFORM pg_temp.assert_true((SELECT count(*) FROM public.permiso) = CASE WHEN phase4 THEN 69 WHEN phase3 THEN 52 ELSE 45 END, 'exact permission catalog count for the installed phase');
+    IF to_regprocedure('public.vettrack_inventario(text,jsonb)') IS NOT NULL THEN
+        expected_catalog := expected_catalog || ARRAY['inventario.crear','inventario.editar','inventario.ajustar','inventario.movimientos','inventario.uso_clinico','proveedores.crear','proveedores.editar','compras.crear','compras.recibir','medicamentos.ver','venta_libre.ver','venta_libre.preparar','inventario.entregar'];
+        expected_reception := expected_reception || ARRAY['medicamentos.ver','venta_libre.ver','venta_libre.preparar','inventario.entregar'];
+        expected_doctor := expected_doctor || ARRAY['medicamentos.ver','inventario.uso_clinico'];
+    END IF;
+    PERFORM pg_temp.assert_true((SELECT count(*) FROM public.permiso) = CASE WHEN to_regprocedure('public.vettrack_inventario(text,jsonb)') IS NOT NULL THEN 82 WHEN phase4 THEN 69 WHEN phase3 THEN 52 ELSE 45 END, 'exact permission catalog count for the installed phase');
     PERFORM pg_temp.assert_true(ARRAY(SELECT clave FROM public.permiso ORDER BY clave) = ARRAY(SELECT unnest(expected_catalog) ORDER BY 1), 'exact permission catalog keys');
     PERFORM pg_temp.assert_true(ARRAY(SELECT clave FROM public.rol_permiso WHERE rol='admin' ORDER BY clave) = ARRAY(SELECT unnest(expected_catalog) ORDER BY 1), 'exact administrator defaults');
     PERFORM pg_temp.assert_true(ARRAY(SELECT clave FROM public.rol_permiso WHERE rol='recepcionista' ORDER BY clave) = ARRAY(SELECT unnest(expected_reception) ORDER BY 1), 'exact receptionist defaults');
@@ -195,7 +200,7 @@ DO $$
 DECLARE affected integer; owner_id uuid; patient_id uuid;
 BEGIN
     PERFORM pg_temp.assert_true((SELECT count(*) FROM public.get_my_permissions()) =
-        CASE WHEN to_regprocedure('public.vettrack_iniciar_consulta(uuid)') IS NOT NULL THEN 21 WHEN to_regprocedure('public.vettrack_guardar_cita(uuid,jsonb)') IS NOT NULL THEN 19 ELSE 18 END, 'receptionist defaults');
+        CASE WHEN to_regprocedure('public.vettrack_inventario(text,jsonb)') IS NOT NULL THEN 25 WHEN to_regprocedure('public.vettrack_iniciar_consulta(uuid)') IS NOT NULL THEN 21 WHEN to_regprocedure('public.vettrack_guardar_cita(uuid,jsonb)') IS NOT NULL THEN 19 ELSE 18 END, 'receptionist defaults');
     PERFORM pg_temp.assert_true(public.has_permission('pacientes.editar') AND NOT public.has_permission('pacientes.eliminar') AND NOT public.has_permission('usuarios.ver'), 'receptionist default restrictions');
     PERFORM pg_temp.assert_true((SELECT count(*) FROM public.cita) = 1 AND NOT EXISTS (SELECT 1 FROM public.diagnostico), 'receptionist cannot bypass clinical permission through dashboard tables');
     DELETE FROM public.mascota WHERE id_mascota = current_setting('vettrack.test.patient')::uuid;
@@ -262,7 +267,7 @@ DO $$
 DECLARE own_patient uuid; affected integer;
 BEGIN
     PERFORM pg_temp.assert_true((SELECT count(*) FROM public.get_my_permissions()) =
-        CASE WHEN to_regprocedure('public.vettrack_iniciar_consulta(uuid)') IS NOT NULL THEN 33 WHEN to_regprocedure('public.vettrack_guardar_cita(uuid,jsonb)') IS NOT NULL THEN 19 ELSE 16 END, 'doctor defaults minus owner override');
+        CASE WHEN to_regprocedure('public.vettrack_inventario(text,jsonb)') IS NOT NULL THEN 35 WHEN to_regprocedure('public.vettrack_iniciar_consulta(uuid)') IS NOT NULL THEN 33 WHEN to_regprocedure('public.vettrack_guardar_cita(uuid,jsonb)') IS NOT NULL THEN 19 ELSE 16 END, 'doctor defaults minus owner override');
     PERFORM pg_temp.assert_true((SELECT count(*) FROM public.diagnostico) = 1, 'doctor clinical read permission preserved');
     PERFORM pg_temp.assert_true((SELECT count(*) FROM public.dueno) = 0 AND (SELECT count(*) FROM public.mascota) >= 1, 'patient access independent of propietarios.ver');
     PERFORM pg_temp.assert_true((SELECT count(*) FROM public.vettrack_propietarios_pacientes()) >= 1, 'minimal owner selector available');

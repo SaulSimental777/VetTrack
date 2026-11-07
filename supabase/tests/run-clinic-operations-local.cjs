@@ -227,6 +227,10 @@ async function main() {
     const database = 'vettrack_phase2_clinic_tests';
     prepareClinicDatabase(database);
     sql(database, ['-f', phase3]);
+    sql(database, ['-f', path.join(root, 'supabase/migrations/20261107043338_appointment_flow_corrections.sql')]);
+    const flow = sql(database, ['-f', path.join(__dirname, 'appointment_flow.sql')]);
+    if (!flow.stdout.includes('ROLLBACK')) throw new Error('Flow suite did not roll back');
+    console.log(flow.stderr.trim());
     for (let pass = 1; pass <= 2; pass += 1) {
       const suite = sql(database, ['-f', path.join(__dirname, 'clinic_operations.sql')]);
       if (!suite.stdout.includes('ROLLBACK')) throw new Error('Clinic operation suite did not roll back');

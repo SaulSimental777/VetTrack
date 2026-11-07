@@ -28,15 +28,18 @@ const guardarCita = async (req, res) => {
   try {
     const id = req.params.id === undefined ? null : validarId(req.params.id)
     validarCampos(req.body, ['id_mascota', 'id_dueno', 'id_medico', 'fecha_inicio', 'motivo', 'servicios', 'forzar_horario', 'estado'])
+    if (!id && req.body.estado !== undefined && req.body.estado !== 'programada') {
+      fallar(400, 'Las nuevas citas se crean automáticamente como programadas.')
+    }
     const datos = {
       id_mascota: validarId(req.body.id_mascota), id_dueno: validarId(req.body.id_dueno),
       id_medico: validarId(req.body.id_medico), fecha_inicio: fechaHora(req.body.fecha_inicio),
       motivo: texto(req.body.motivo, 'El motivo de la cita', 2000),
       servicios: listaIds(req.body.servicios, 1),
       forzar_horario: booleano(req.body.forzar_horario, false),
-      estado: req.body.estado === undefined ? 'programada' : req.body.estado,
+      ...(!id || req.body.estado !== undefined ? { estado: id ? req.body.estado : 'programada' } : {}),
     }
-    if (!estadosEditables.includes(datos.estado)) fallar(400, 'Este estado no está disponible en la operación de citas.')
+    if (datos.estado !== undefined && !estadosEditables.includes(datos.estado)) fallar(400, 'Este estado no está disponible en la operación de citas.')
     if (datos.forzar_horario) permiso(req, 'citas.forzar_horario')
     // No specialty is required or compared. SQL validates patient ownership,
     // active doctor membership, schedule, blocks and concurrent appointments.

@@ -81,7 +81,7 @@ deadline.unref();
       if(url.pathname==='/api/servicios'&&method==='POST'){const service={id_servicio:id(32),...body,especialidades:specialties.filter(s=>body.especialidades.includes(s.id_especialidad))};services.push(service);state.writes.push({kind:'service',body});return json({message:'Creado',servicio:service},201);}
       if(url.pathname.startsWith('/api/servicios/')&&method==='PUT'){const service=services.find(s=>s.id_servicio===url.pathname.split('/')[3]);Object.assign(service,body);state.writes.push({kind:'price',body});return json({message:'Actualizado',servicio:service});}
       if(url.pathname==='/api/citas/selectores')return json(selectors);
-      if(url.pathname==='/api/citas'&&method==='GET')return json(appointments);
+      if(url.pathname==='/api/citas'&&method==='GET')return json(appointments.filter(c=>(!url.searchParams.get('inicio')||Date.parse(c.fecha_fin)>Date.parse(url.searchParams.get('inicio')))&&(!url.searchParams.get('fin')||Date.parse(c.fecha_inicio)<Date.parse(url.searchParams.get('fin')))));
       if(url.pathname==='/api/citas'&&method==='POST'){
         const selected=services.filter(s=>body.servicios.includes(s.id_servicio)).map(s=>({id_servicio:s.id_servicio,nombre:s.nombre,precio_aplicado:s.costo,duracion_aplicada:s.duracion_minutos,estado:'pendiente'}));
         const appointment={id_cita:id(60),...body,fecha_fin:new Date(Date.parse(body.fecha_inicio)+selected.reduce((sum,s)=>sum+s.duracion_aplicada,0)*60000).toISOString(),paciente:'Tornado',propietario:'Lupe Martínez',medico:doctors.find(d=>d.id===body.id_medico).nombre,servicios:selected,subtotal:selected.reduce((sum,s)=>sum+s.precio_aplicado,0)};
@@ -105,6 +105,7 @@ deadline.unref();
   await until(()=>text('+ Nueva cita'),'appointments page');
   await role('recepcionista');
   await click('Nueva cita');await until(()=>evaluate('document.querySelector("#appointment-owner")?.options.length===2'),'appointment selectors');
+  assert.equal(await evaluate('document.querySelector("#appointment-state")===null'),true);
   await select('#appointment-owner','00000000-0000-4000-8000-000000000040');
   await select('#appointment-patient','00000000-0000-4000-8000-000000000050');
   await fill('#appointment-reason','Se lastimó una pata.');
@@ -121,6 +122,7 @@ deadline.unref();
   await evaluate('document.querySelector(".operations-slot").click()');await click('Crear cita');
   await until(()=>text('Cita creada.'),'appointment saved');
   await until(()=>text('Tornado'),'appointment reload');
+  assert.equal(await evaluate('document.querySelector("#appointments-date").value'),'2030-01-07');
   assert.equal(await text('Tornado'),true);assert.equal(await text('Lupe Martínez'),true);assert.equal(await text('Dr. General'),true);
   assert.deepEqual(await evaluate('window.__clinicSmoke.writes.find(w=>w.kind==="appointment").body.servicios'),['00000000-0000-4000-8000-000000000030','00000000-0000-4000-8000-000000000031']);
   assert.equal(await evaluate('Object.hasOwn(window.__clinicSmoke.writes.find(w=>w.kind==="appointment").body,"id_veterinaria")'),false);
@@ -130,7 +132,7 @@ deadline.unref();
   assert.equal(await evaluate('document.querySelector("#service-name")===null'),true);
   await fill('#service-price','700');await click('Guardar cambios');await until(()=>text('Servicio actualizado.'),'price saved');
   assert.deepEqual(await evaluate('window.__clinicSmoke.writes.find(w=>w.kind==="price").body'),{costo:700});
-  await route('/citas');await until(()=>text('Radiografía'),'historic appointment');
+  await route('/citas');await fill('#appointments-date','2030-01-07');await until(()=>text('Radiografía'),'historic appointment');
   assert.equal(await evaluate('document.querySelector(".users-table tbody").innerText.includes("650.00")'),true);
   await role('medico');assert.equal(await text('+ Nueva cita'),false);assert.equal(await evaluate('document.querySelectorAll(".operations-table-actions button").length'),0);
   await route('/medicos');await until(()=>text('Dr. General'),'doctor list');assert.equal(await text('Editar horario'),false);assert.equal(await text('Sin especialidades'),true);

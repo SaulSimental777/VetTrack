@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from './api'
+export { formatDuration } from './duration'
 
 export interface Especialidad { id_especialidad: string; nombre: string; descripcion: string | null }
 export interface Horario { id_horario?: string; dia_semana: number; hora_inicio: string; hora_fin: string; activo: boolean }
@@ -8,7 +9,7 @@ export interface Medico { id: string; nombre: string | null; activo: boolean; es
 export interface Servicio { id_servicio: string; nombre: string; descripcion: string | null; costo: number | string; duracion_minutos: number; activo: boolean; especialidades: Especialidad[] }
 export interface CitaServicio { id_servicio: string; nombre: string; precio_aplicado: number | string; duracion_aplicada: number; estado: string }
 export interface Cita { id_cita: string; fecha_inicio: string; fecha_fin: string; estado: string; motivo: string | null; id_mascota: string; id_dueno: string; id_medico: string; paciente: string | null; propietario: string | null; medico: string | null; servicios: CitaServicio[]; subtotal: number | string }
-export interface Disponibilidad { fecha: string; duracion_minutos: number; zona_horaria: string; slots: { fecha_inicio: string; fecha_fin: string }[] }
+export interface Disponibilidad { fecha: string; duracion_minutos: number; zona_horaria: string; bloque_maximo_minutos?: number; slots: { fecha_inicio: string; fecha_fin: string }[] }
 export const weekdays = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 export const operationError = (cause: unknown, fallback = 'No se pudo completar la operación.') => cause instanceof Error ? cause.message : fallback
 export const money = (value: number | string) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(value))

@@ -83,6 +83,20 @@ const schedule = (changes = {}) => ({ dia_semana: 1, hora_inicio: '09:00', hora_
 const appointmentBody = (changes = {}) => ({ id_mascota: patient, id_dueno: owner, id_medico: doctor, fecha_inicio: '2026-11-09T09:00:00-08:00', motivo: ' Revisión ', servicios: [service, service2], ...changes })
 const noSecrets = body => assert.doesNotMatch(JSON.stringify(body), /private upstream|secret-token|service_role|password_hash/)
 
+test('new bookings always start programmed and cannot inject a later workflow state', async () => {
+  for (const estado of ['confirmada', 'en_espera', 'no_asistio', 'completada']) {
+    assert.equal((await http('/api/citas', 'POST', appointmentBody({ estado }))).status, 400)
+  }
+  assert.deepEqual(state.calls, [])
+})
+
+test('editing without a state does not silently downgrade an existing appointment', async () => {
+  plan('vettrack_guardar_cita', { id_cita: appointment, estado: 'confirmada' }, null, args => {
+    assert.equal(Object.hasOwn(args.p_datos, 'estado'), false)
+  })
+  assert.equal((await http(`/api/citas/${appointment}`, 'PUT', appointmentBody())).status, 200)
+})
+
 test('new clinic HTTP routes reject missing/invalid JWT, inactive users and global Superadmin before operation RPCs', async () => {
   assert.equal((await http('/api/medicos', 'GET', undefined, null)).status, 401)
   assert.equal((await http('/api/medicos', 'GET', undefined, 'invalid')).status, 401)

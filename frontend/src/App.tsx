@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
@@ -7,9 +7,22 @@ import Duenos from './pages/Duenos'
 import Pacientes from './pages/Pacientes'
 import Tenants from './pages/Tenants'
 import Dashboard from './pages/Dashboard'
+import Usuarios from './pages/Usuarios'
+import { apiFetch } from './lib/api'
+import { PermissionsContext } from './lib/permissions'
+import type { ClinicAccess } from './lib/permissions'
 import './App.css'
 
-type Pagina = 'dashboard' | 'duenos' | 'pacientes'
+const clinicRoutes = [
+  { path: '/dashboard', title: 'Dashboard', permission: 'dashboard.ver', icon: '▦' },
+  { path: '/propietarios', title: 'Propietarios', permission: 'propietarios.ver', icon: '♙' },
+  { path: '/pacientes', title: 'Pacientes', permission: 'pacientes.ver', icon: '♧' },
+  { path: '/configuracion/usuarios', title: 'Usuarios', permission: 'usuarios.ver', icon: '⚙' },
+] as const
+
+const currentClinicPath = () => window.location.hash.startsWith('#/')
+  ? window.location.hash.slice(1).split('?')[0]
+  : (window.location.pathname === '/' ? '/dashboard' : window.location.pathname)
 
 function SessionScreen({ message, children }: { message: string; children?: ReactNode }) {
   return (
@@ -51,9 +64,10 @@ function LogoutButton() {
   )
 }
 
-function Workspace({ session, clinic, title, navigation, children }: {
+function Workspace({ session, clinic, role, title, navigation, children }: {
   session: Session
   clinic?: string
+  role?: string
   title: string
   navigation: ReactNode
   children: ReactNode
@@ -73,7 +87,7 @@ function Workspace({ session, clinic, title, navigation, children }: {
       <main className="main-content">
         <header className="topbar">
           <div>
-            <span className="breadcrumb">VetTrack / {title}</span>
+            <span className="breadcrumb">VetTrack / {clinic ? `${clinic} / ` : ''}{title}</span>
             <h2>{title}</h2>
           </div>
           <div className="user-area">
@@ -83,7 +97,7 @@ function Workspace({ session, clinic, title, navigation, children }: {
             </div>
             <div className="user-avatar" aria-hidden="true">{email.charAt(0).toUpperCase()}</div>
             <div className="user-info">
-              <strong>{clinic ? 'Usuario de clínica' : 'Superadministrador'}</strong>
+              <strong>{clinic ? (role || 'Usuario de clínica') : 'Superadministrador'}</strong>
               <span>{email}</span>
             </div>
           </div>
@@ -95,75 +109,82 @@ function Workspace({ session, clinic, title, navigation, children }: {
 }
 
 function ClinicWorkspace({ session }: { session: Session }) {
-  const [clinic, setClinic] = useState<{ id: string; nombre: string } | null>(null)
+  const [access, setAccess] = useState<ClinicAccess | null>(null)
   const [error, setError] = useState('')
-  const [pagina, setPagina] = useState<Pagina>('dashboard')
-  const userId = session.user.id
+  const [path, setPath] = useState(currentClinicPath)
+  const request = useRef<AbortController | null>(null)
 
-  useEffect(() => {
+  const refresh = useCallback(async () => {
+    request.current?.abort()
     const controller = new AbortController()
-
-    const loadClinic = async () => {
-      try {
-        const { data: perfil, error: perfilError } = await supabase
-          .from('perfilusuario')
-          .select('id_veterinaria')
-          .eq('id', userId)
-          .abortSignal(controller.signal)
-          .single()
-
-        if (controller.signal.aborted) return
-        if (perfilError || !perfil?.id_veterinaria) {
-          throw new Error('Tu cuenta no tiene un perfil de clínica disponible. Solicita al administrador que revise tu acceso.')
-        }
-
-        const { data: vet, error: vetError } = await supabase
-          .from('veterinaria')
-          .select('id_veterinaria, nombre')
-          .eq('id_veterinaria', perfil.id_veterinaria)
-          .abortSignal(controller.signal)
-          .single()
-
-        if (controller.signal.aborted) return
-        if (vetError || !vet?.nombre) {
-          throw new Error('No se pudo obtener la clínica asignada. Solicita al administrador que revise tu acceso.')
-        }
-        setClinic({ id: vet.id_veterinaria, nombre: vet.nombre })
-      } catch (cause) {
-        if (!controller.signal.aborted) {
-          setError(cause instanceof Error ? cause.message : 'No se pudo cargar la clínica asignada.')
-        }
+    request.current = controller
+    try {
+      const data = await apiFetch<ClinicAccess>('/api/sesion', { signal: controller.signal })
+      if (!controller.signal.aborted) { setAccess(data); setError('') }
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        setAccess(null)
+        setError(cause instanceof Error ? cause.message : 'No se pudo verificar el acceso a la clínica.')
+        throw cause
       }
     }
+  }, [])
 
-    void loadClinic()
-    return () => controller.abort()
-  }, [userId])
+  useEffect(() => {
+    const reload = () => { void refresh().catch(() => {}) }
+    const routeChanged = () => setPath(currentClinicPath())
+    const visible = () => { if (document.visibilityState === 'visible') reload() }
+    reload()
+    window.addEventListener('focus', reload)
+    window.addEventListener('vettrack:access-changed', reload)
+    window.addEventListener('hashchange', routeChanged)
+    window.addEventListener('popstate', routeChanged)
+    document.addEventListener('visibilitychange', visible)
+    const interval = window.setInterval(reload, 30000)
+    return () => {
+      request.current?.abort()
+      window.clearInterval(interval)
+      window.removeEventListener('focus', reload)
+      window.removeEventListener('vettrack:access-changed', reload)
+      window.removeEventListener('hashchange', routeChanged)
+      window.removeEventListener('popstate', routeChanged)
+      document.removeEventListener('visibilitychange', visible)
+    }
+  }, [refresh])
 
-  if (error) return <SessionScreen message={error}><div className="session-actions"><LogoutButton /></div></SessionScreen>
-  if (!clinic) return <SessionScreen message="Cargando tu clínica…" />
+  const can = useCallback((key: string) => access?.permisos.includes(key) === true, [access])
+  if (error) return <SessionScreen message={error}><button type="button" className="primary-button" onClick={() => { void refresh().catch(() => {}) }}>Reintentar</button><div className="session-actions"><LogoutButton /></div></SessionScreen>
+  if (!access) return <SessionScreen message="Verificando tu clínica y permisos…" />
+  const route = clinicRoutes.find(item => item.path === path)
+  const allowed = route && can(route.permission)
+  const pageKey = `${access.id}:${access.id_veterinaria}:${access.rol}:${[...access.permisos].sort().join(',')}`
+  const roleLabel = { admin: 'Administrador', recepcionista: 'Recepcionista', medico: 'Médico' }[access.rol]
 
   return (
-    <Workspace session={session} clinic={clinic.nombre} title={pagina === 'duenos' ? 'Propietarios' : pagina === 'pacientes' ? 'Pacientes' : 'Dashboard'} navigation={
+    <PermissionsContext.Provider value={{ access, refresh, can }}>
+    <Workspace session={session} clinic={access.nombre_veterinaria} role={roleLabel} title={route?.title || 'Acceso no autorizado'} navigation={
       <>
-        <button type="button" className={`nav-item ${pagina === 'dashboard' ? 'active' : ''}`} aria-current={pagina === 'dashboard' ? 'page' : undefined} onClick={() => setPagina('dashboard')}>
-          <span aria-hidden="true">▦</span><span className="nav-label">Dashboard</span>
-        </button>
-        <button type="button" className={`nav-item ${pagina === 'duenos' ? 'active' : ''}`} aria-current={pagina === 'duenos' ? 'page' : undefined} onClick={() => setPagina('duenos')}>
-          <span aria-hidden="true">♙</span><span className="nav-label">Propietarios</span>
-        </button>
-        <button type="button" className={`nav-item ${pagina === 'pacientes' ? 'active' : ''}`} aria-current={pagina === 'pacientes' ? 'page' : undefined} onClick={() => setPagina('pacientes')}><span aria-hidden="true">♧</span><span className="nav-label">Pacientes</span></button>
-        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">▣</span><span className="nav-label">Citas</span></button>
-        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">✚</span><span className="nav-label">Diagnósticos</span></button>
-        <div className="nav-section">Administración</div>
-        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">◆</span><span className="nav-label">Servicios</span></button>
-        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">□</span><span className="nav-label">Productos</span></button>
-        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">$</span><span className="nav-label">Pagos</span></button>
-        <button type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">⚙</span><span className="nav-label">Configuración</span></button>
+        {clinicRoutes.filter(item => can(item.permission)).map(item => <div key={item.path}>
+          {item.path === '/configuracion/usuarios' && <div className="nav-section">Configuración</div>}
+          <button type="button" className={`nav-item ${path === item.path ? 'active' : ''}`} aria-current={path === item.path ? 'page' : undefined} onClick={() => { window.location.hash = item.path }}>
+            <span aria-hidden="true">{item.icon}</span><span className="nav-label">{item.title}</span>
+          </button>
+        </div>)}
+        {[
+          ['citas.ver', 'Citas', '▣'], ['diagnosticos.ver', 'Diagnósticos', '✚'],
+          ['servicios.ver', 'Servicios', '◆'], ['inventario.ver', 'Inventario', '□'], ['pagos.ver', 'Pagos', '$'],
+        ].filter(([permission]) => can(permission)).map(([permission, label, icon]) => <button key={permission} type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">{icon}</span><span className="nav-label">{label}</span></button>)}
       </>
     }>
-      {pagina === 'duenos' ? <Duenos /> : pagina === 'pacientes' ? <Pacientes /> : <Dashboard clinicId={clinic.id} clinicName={clinic.nombre} />}
+      <div key={pageKey}>
+        {!allowed ? <div className="panel access-denied" role="alert"><h3>403 · Acceso no autorizado</h3><p>No tienes permiso para abrir esta pantalla.</p></div>
+          : path === '/propietarios' ? <Duenos />
+          : path === '/pacientes' ? <Pacientes />
+          : path === '/configuracion/usuarios' ? <Usuarios />
+          : <Dashboard clinicId={access.id_veterinaria} clinicName={access.nombre_veterinaria} />}
+      </div>
     </Workspace>
+    </PermissionsContext.Provider>
   )
 }
 

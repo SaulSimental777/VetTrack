@@ -3,6 +3,14 @@ import { supabase } from './supabase'
 const API_URL =
   import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
+export class ApiError extends Error {
+  readonly status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
 export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -40,9 +48,13 @@ export async function apiFetch<T>(
     .catch(() => null)
 
   if (!response.ok) {
-    throw new Error(
+    if ((response.status === 401 || response.status === 403) && endpoint !== '/api/sesion') {
+      window.dispatchEvent(new Event('vettrack:access-changed'))
+    }
+    throw new ApiError(
       data?.error ||
-      `Error HTTP ${response.status}`
+      `Error HTTP ${response.status}`,
+      response.status
     )
   }
 

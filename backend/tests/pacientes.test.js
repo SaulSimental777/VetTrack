@@ -199,6 +199,8 @@ test('patient router requires the existing auth middleware for all four endpoint
   assert.equal(router.stack[0].handle, auth)
   for (const [method, path, handler] of [['get', '/', 'obtenerPacientes'], ['post', '/', 'crearPaciente'],
     ['put', '/:id', 'actualizarPaciente'], ['delete', '/:id', 'eliminarPaciente']]) {
-    assert.equal(router.stack.find(layer => layer.route?.methods[method] && layer.route.path === path).route.stack[0].handle, handlers[handler])
+    const route = router.stack.find(layer => layer.route?.methods[method] && layer.route.path === path).route
+    assert.equal(route.stack.at(-1).handle, handlers[handler])
+    assert.equal(route.stack.length, 2, 'Every patient endpoint also requires its functional permission')
   }
 })

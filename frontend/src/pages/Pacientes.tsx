@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import { apiFetch } from '../lib/api'
+import { usePermissions } from '../lib/permissions'
 import './Duenos.css'
 import './Pacientes.css'
 
@@ -22,6 +23,7 @@ const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Tijuan
 const errorMessage = (cause: unknown, fallback: string) => cause instanceof Error ? cause.message : fallback
 
 function Pacientes() {
+  const { can } = usePermissions()
   const [pacientes, setPacientes] = useState<Paciente[]>([])
   const [propietarios, setPropietarios] = useState<Propietario[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,7 +45,7 @@ function Pacientes() {
       .then(data => { if (!controller.signal.aborted) setPacientes(data) })
       .catch(() => { if (!controller.signal.aborted) setError('No se pudieron cargar los pacientes.') })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
-    apiFetch<Propietario[]>('/api/duenos', { signal: controller.signal })
+    apiFetch<Propietario[]>('/api/pacientes/propietarios', { signal: controller.signal })
       .then(data => { if (!controller.signal.aborted) setPropietarios(data) })
       .catch(() => { if (!controller.signal.aborted) setOwnersError('No se pudieron cargar los propietarios. Recarga la página para registrar o editar pacientes.') })
     return () => controller.abort()
@@ -72,6 +74,7 @@ function Pacientes() {
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
   }
   const openEditor = (paciente: Paciente | null) => {
+    if (!can(paciente ? 'pacientes.editar' : 'pacientes.crear')) return
     focusReturn.current = document.activeElement as HTMLElement
     setModalError('')
     setForm(paciente ? {
@@ -91,6 +94,7 @@ function Pacientes() {
   const save = async (event: FormEvent) => {
     event.preventDefault()
     if (!editor || pending) return
+    if (!can(editor.paciente ? 'pacientes.editar' : 'pacientes.crear')) return
     if (!form.nombre.trim() || !form.id_dueno) { setModalError('Completa el nombre y selecciona un propietario.'); return }
     if (form.fecha_nacimiento && form.fecha_nacimiento > today()) { setModalError('La fecha de nacimiento no puede ser futura.'); return }
     setPending(true)
@@ -107,7 +111,7 @@ function Pacientes() {
     finally { setPending(false) }
   }
   const remove = async () => {
-    if (!eliminando || pending) return
+    if (!eliminando || pending || !can('pacientes.eliminar')) return
     setPending(true)
     setModalError('')
     try {
@@ -126,10 +130,10 @@ function Pacientes() {
     <div className="duenos-page pacientes-page">
       <div className="duenos-header">
         <div><span className="eyebrow">Clínica / Pacientes</span><h3>Pacientes</h3><p>Administra los datos básicos de los pacientes de tu clínica.</p></div>
-        <button className="primary-button" type="button" disabled={loading || !propietarios.length || Boolean(ownersError)} onClick={() => openEditor(null)}>+ Nuevo paciente</button>
+        {can('pacientes.crear') && <button className="primary-button" type="button" disabled={loading || !propietarios.length || Boolean(ownersError)} onClick={() => openEditor(null)}>+ Nuevo paciente</button>}
       </div>
       {ownersError && <p className="pacientes-alert" role="alert">{ownersError}</p>}
-      {!loading && !ownersError && !propietarios.length && <p className="pacientes-alert">Registra un propietario en Propietarios antes de agregar un paciente.</p>}
+      {can('pacientes.crear') && !loading && !ownersError && !propietarios.length && <p className="pacientes-alert">Solicita que se registre un propietario antes de agregar un paciente.</p>}
       <div className="duenos-card" aria-busy={loading}>
         <div className="duenos-card-header">
           <div><strong>Pacientes registrados</strong><span>{loading ? 'Cargando…' : `${pacientes.length} registros · ${filtered.length} en la búsqueda`}</span></div>
@@ -143,8 +147,8 @@ function Pacientes() {
             <thead><tr><th scope="col">Nombre</th><th scope="col">Especie</th><th scope="col">Raza</th><th scope="col">Sexo</th><th scope="col">Propietario</th><th scope="col">Acciones</th></tr></thead>
             <tbody>{filtered.map(paciente => <tr key={paciente.id_mascota}>
               <td><strong>{paciente.nombre}</strong></td><td>{paciente.especie || 'Sin registrar'}</td><td>{paciente.raza || '—'}</td><td>{paciente.sexo || 'Sin registrar'}</td><td>{paciente.propietario?.nombre || 'No disponible'}</td>
-              <td><div className="dueno-actions"><button type="button" aria-label={`Editar ${paciente.nombre}`} disabled={!propietarios.length || Boolean(ownersError)} onClick={() => openEditor(paciente)}>Editar</button>
-                <button type="button" className="danger" aria-label={`Eliminar ${paciente.nombre}`} onClick={() => { focusReturn.current = document.activeElement as HTMLElement; setModalError(''); setEliminando(paciente) }}>Eliminar</button></div></td>
+              <td><div className="dueno-actions">{can('pacientes.editar') && <button type="button" aria-label={`Editar ${paciente.nombre}`} disabled={!propietarios.length || Boolean(ownersError)} onClick={() => openEditor(paciente)}>Editar</button>}
+                {can('pacientes.eliminar') && <button type="button" className="danger" aria-label={`Eliminar ${paciente.nombre}`} onClick={() => { focusReturn.current = document.activeElement as HTMLElement; setModalError(''); setEliminando(paciente) }}>Eliminar</button>}</div></td>
             </tr>)}</tbody>
           </table></div>}
       </div>

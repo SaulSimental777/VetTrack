@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../lib/api'
+import { usePermissions } from '../lib/permissions'
 import './Duenos.css'
 
 interface Dueno {
@@ -11,6 +12,7 @@ interface Dueno {
 }
 
 function Duenos() {
+  const { can } = usePermissions()
   const [duenos, setDuenos] = useState<Dueno[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -79,6 +81,7 @@ const cargarDuenos = async () => {
   }
 
   const abrirModal = () => {
+  if (!can('propietarios.crear')) return
   setDuenoEditando(null)
   limpiarFormulario()
   setError('')
@@ -86,6 +89,7 @@ const cargarDuenos = async () => {
 }
 
   const abrirModalEditar = (dueno: Dueno) => {
+  if (!can('propietarios.editar')) return
   setDuenoEditando(dueno)
 
   setNombre(dueno.nombre)
@@ -121,6 +125,7 @@ const cargarDuenos = async () => {
   e: React.FormEvent
 ) => {
   e.preventDefault()
+  if (!can(duenoEditando ? 'propietarios.editar' : 'propietarios.crear')) return
 
   if (!nombre.trim()) {
     setError(
@@ -178,7 +183,7 @@ const cargarDuenos = async () => {
 }
 
 const eliminarDueno = async () => {
-  if (!duenoEliminando) return
+  if (!duenoEliminando || !can('propietarios.eliminar')) return
 
   setEliminando(true)
   setError('')
@@ -221,12 +226,12 @@ const eliminarDueno = async () => {
           </p>
         </div>
 
-        <button
+        {can('propietarios.crear') && <button
           className="primary-button"
           onClick={abrirModal}
         >
           + Nuevo propietario
-        </button>
+        </button>}
       </div>
 
       <div className="duenos-card">
@@ -267,12 +272,12 @@ const eliminarDueno = async () => {
               Esta clínica todavía no tiene propietarios registrados.
             </p>
 
-            <button
+            {can('propietarios.crear') && <button
               className="primary-button"
               onClick={abrirModal}
             >
               + Registrar primer propietario
-            </button>
+            </button>}
           </div>
         )}
 
@@ -308,14 +313,14 @@ const eliminarDueno = async () => {
 
                     <td>
                       <div className="dueno-actions">
-                       <button onClick={() => abrirModalEditar(dueno)}>Editar</button>
+                       {can('propietarios.editar') && <button onClick={() => abrirModalEditar(dueno)}>Editar</button>}
 
-                        <button
+                        {can('propietarios.eliminar') && <button
                         className="danger"
                         onClick={() => setDuenoEliminando(dueno)}
                         >
                         Eliminar
-                        </button>
+                        </button>}
                       </div>
                     </td>
                   </tr>

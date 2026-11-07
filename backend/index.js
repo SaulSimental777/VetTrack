@@ -6,6 +6,9 @@ const cors = require('cors')
 const duenosRoutes = require('./routes/duenos.routes')
 const tenantsRoutes = require('./routes/tenants.routes')
 const pacientesRoutes = require('./routes/pacientes.routes')
+const usuariosRoutes = require('./routes/usuarios.routes')
+const especialidadesRoutes = require('./routes/especialidades.routes')
+const sesionRoutes = require('./routes/sesion.routes')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -34,6 +37,9 @@ app.get('/api/health', (req, res) => {
 app.use('/api/duenos', duenosRoutes)
 app.use('/api/tenants', tenantsRoutes)
 app.use('/api/pacientes', pacientesRoutes)
+app.use('/api/usuarios', usuariosRoutes)
+app.use('/api/especialidades', especialidadesRoutes)
+app.use('/api/sesion', sesionRoutes)
 
 if (require.main === module) {
   app.listen(PORT, () => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { usePermissions } from '../lib/permissions'
 
 const metrics = [
   { table: 'dueno', label: 'Propietarios', icon: '♙', detail: 'Registrados en la clínica' },
@@ -9,6 +10,7 @@ const metrics = [
 ] as const
 
 function Dashboard({ clinicId, clinicName }: { clinicId: string; clinicName: string }) {
+  const { access, can } = usePermissions()
   const [counts, setCounts] = useState<(number | null)[] | null>(null)
   const [failed, setFailed] = useState(false)
 
@@ -17,8 +19,10 @@ function Dashboard({ clinicId, clinicName }: { clinicId: string; clinicName: str
 
     const loadCounts = async () => {
       const results = await Promise.allSettled(metrics.map(async ({ table }) => {
+        const permission = { dueno: 'propietarios.ver', mascota: 'pacientes.ver', cita: 'citas.ver', diagnostico: 'diagnosticos.ver' }[table]
+        if (!access.permisos.includes(permission)) return null
         const query = table === 'mascota'
-          ? supabase.from(table).select('dueno!inner(id_veterinaria)', { count: 'exact', head: true }).eq('dueno.id_veterinaria', clinicId)
+          ? supabase.from(table).select('*', { count: 'exact', head: true })
           : supabase.from(table).select('*', { count: 'exact', head: true }).eq('id_veterinaria', clinicId)
         const { count, error } = await query.abortSignal(controller.signal)
         if (error) throw error
@@ -27,12 +31,12 @@ function Dashboard({ clinicId, clinicName }: { clinicId: string; clinicName: str
 
       if (controller.signal.aborted) return
       setCounts(results.map(result => result.status === 'fulfilled' ? result.value : null))
-      setFailed(results.some(result => result.status === 'rejected' || result.value === null))
+      setFailed(results.some(result => result.status === 'rejected'))
     }
 
     void loadCounts()
     return () => controller.abort()
-  }, [clinicId])
+  }, [clinicId, access.permisos])
 
   return (
     <>
@@ -45,7 +49,7 @@ function Dashboard({ clinicId, clinicName }: { clinicId: string; clinicName: str
       </div>
       {failed && <p className="dashboard-error" role="alert">No se pudieron cargar algunas estadísticas. Los valores no disponibles se muestran como —.</p>}
       <section className="stats-grid" aria-label="Estadísticas de la clínica" aria-busy={counts === null}>
-        {metrics.map((metric, index) => (
+        {metrics.map((metric, index) => can({ dueno: 'propietarios.ver', mascota: 'pacientes.ver', cita: 'citas.ver', diagnostico: 'diagnosticos.ver' }[metric.table]) && (
           <div className="stat-card" key={metric.table}>
             <div className="stat-icon" aria-hidden="true">{metric.icon}</div>
             <div>

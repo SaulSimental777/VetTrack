@@ -156,6 +156,9 @@ const eliminarDueno = async (req, res) => {
       .select('id_dueno')
       .maybeSingle()
 
+    if (error?.code === '23503') {
+      return res.status(409).json({ error: 'No se puede eliminar el propietario porque tiene pacientes o información relacionada.' })
+    }
     if (error) {
       console.error('Error en operación de propietarios:', error)
       return res.status(400).json({

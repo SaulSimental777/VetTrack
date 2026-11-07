@@ -248,12 +248,30 @@ BEGIN
     GET DIAGNOSTICS affected_rows = ROW_COUNT;
     IF affected_rows <> 1 THEN RAISE EXCEPTION 'Own owner DELETE failed'; END IF;
 
-    UPDATE public.perfilusuario SET nombre = 'Own profile update', telefono = '5550000000' WHERE id = auth.uid();
-    GET DIAGNOSTICS affected_rows = ROW_COUNT;
-    IF affected_rows <> 1 THEN RAISE EXCEPTION 'Own permitted profile UPDATE failed'; END IF;
-    UPDATE public.perfilusuario SET nombre = 'Foreign profile update' WHERE id = current_setting('vettrack.test.user_b')::uuid;
-    GET DIAGNOSTICS affected_rows = ROW_COUNT;
-    IF affected_rows <> 0 THEN RAISE EXCEPTION 'Foreign profile UPDATE succeeded'; END IF;
+    IF to_regprocedure('public.vettrack_editar_usuario(uuid,text,text,text,uuid[])') IS NOT NULL THEN
+        -- Phase 2 routes membership/profile changes through the checked RPC.
+        BEGIN
+            UPDATE public.perfilusuario SET nombre = 'Direct update' WHERE id = auth.uid();
+            RAISE EXCEPTION 'Direct profile UPDATE bypassed user administration';
+        EXCEPTION WHEN insufficient_privilege THEN NULL;
+        END;
+        PERFORM public.vettrack_editar_usuario(auth.uid(), 'Own profile update', '5550000000', 'admin', ARRAY[]::uuid[]);
+        IF NOT EXISTS (SELECT 1 FROM public.perfilusuario WHERE id = auth.uid() AND nombre = 'Own profile update') THEN
+            RAISE EXCEPTION 'Authorized own profile RPC UPDATE failed';
+        END IF;
+        BEGIN
+            PERFORM public.vettrack_editar_usuario(current_setting('vettrack.test.user_b')::uuid, 'Foreign profile update', NULL, 'admin', ARRAY[]::uuid[]);
+            RAISE EXCEPTION 'Foreign profile RPC UPDATE succeeded';
+        EXCEPTION WHEN no_data_found THEN NULL;
+        END;
+    ELSE
+        UPDATE public.perfilusuario SET nombre = 'Own profile update', telefono = '5550000000' WHERE id = auth.uid();
+        GET DIAGNOSTICS affected_rows = ROW_COUNT;
+        IF affected_rows <> 1 THEN RAISE EXCEPTION 'Own permitted profile UPDATE failed'; END IF;
+        UPDATE public.perfilusuario SET nombre = 'Foreign profile update' WHERE id = current_setting('vettrack.test.user_b')::uuid;
+        GET DIAGNOSTICS affected_rows = ROW_COUNT;
+        IF affected_rows <> 0 THEN RAISE EXCEPTION 'Foreign profile UPDATE succeeded'; END IF;
+    END IF;
 
     IF has_table_privilege('authenticated', 'public.dueno', 'TRUNCATE')
        OR has_table_privilege('anon', 'public.dueno', 'TRUNCATE') THEN
@@ -380,10 +398,19 @@ BEGIN
         RAISE EXCEPTION 'Unexpected get_my_veterinaria execute privileges';
     END IF;
     IF EXISTS (SELECT 1 FROM pg_catalog.pg_policies WHERE schemaname = 'public'
-        AND tablename = 'mascota' AND policyname = 'Permitir todo')
-       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policies WHERE schemaname = 'public'
-        AND tablename = 'mascota' AND policyname = 'tenant_mascota') THEN
+        AND tablename = 'mascota' AND policyname = 'Permitir todo') THEN
         RAISE EXCEPTION 'Unexpected mascota policies after hardening';
+    END IF;
+    IF to_regprocedure('public.get_my_permissions()') IS NOT NULL THEN
+        IF (SELECT count(*) FROM pg_catalog.pg_policies WHERE schemaname = 'public' AND tablename = 'mascota') <> 4
+           OR EXISTS (SELECT 1 FROM pg_catalog.pg_policies WHERE schemaname = 'public' AND tablename = 'mascota'
+               AND (policyname NOT IN ('patients_select', 'patients_insert', 'patients_update', 'patients_delete')
+                    OR roles <> ARRAY['authenticated']::name[])) THEN
+            RAISE EXCEPTION 'Expected four permission-aware patient policies in Phase 2';
+        END IF;
+    ELSIF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policies WHERE schemaname = 'public'
+        AND tablename = 'mascota' AND policyname = 'tenant_mascota') THEN
+        RAISE EXCEPTION 'Original tenant policy is missing in Phase 1';
     END IF;
     RAISE NOTICE 'Client privilege checks passed';
 END;

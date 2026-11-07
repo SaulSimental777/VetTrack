@@ -336,6 +336,7 @@ DECLARE
     privilege_name text;
     registration_function record;
     phase3 boolean := to_regprocedure('public.vettrack_guardar_cita(uuid,jsonb)') IS NOT NULL;
+    phase4 boolean := to_regprocedure('public.vettrack_iniciar_consulta(uuid)') IS NOT NULL;
     read_only_tables text[] := ARRAY['cita', 'diagnostico', 'metododepago'];
     operational_tables text[] := ARRAY[]::text[];
 BEGIN
@@ -347,6 +348,10 @@ BEGIN
                 'public.servicio_especialidad'::regclass, 'public.cita_servicio'::regclass]) AND NOT relrowsecurity) THEN
             RAISE EXCEPTION 'A Phase 3 operational table lost RLS';
         END IF;
+    END IF;
+    IF phase4 THEN
+        operational_tables := operational_tables || ARRAY['consulta','tratamiento','receta_detalle','vacunacion','desparasitacion','estudio_clinico','orden_recepcion','documento_clinico'];
+        read_only_tables := read_only_tables || ARRAY['consulta','tratamiento','receta','receta_detalle','vacunacion','desparasitacion','estudio_clinico','orden_recepcion'];
     END IF;
     FOREACH table_name IN ARRAY ARRAY[
         'dueno', 'mascota', 'cita', 'diagnostico', 'historialmedico', 'receta',

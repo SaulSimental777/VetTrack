@@ -65,3 +65,18 @@ export async function apiFetch<T>(
 
   return data as T
 }
+
+export async function downloadApiFile(endpoint: string, filename: string): Promise<void> {
+  const { data: { session }, error } = await supabase.auth.getSession()
+  if (error || !session) throw new Error('No hay una sesión activa')
+  const response = await fetch(`${API_URL}${endpoint}`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+  if (!response.ok) {
+    if ([401, 403].includes(response.status)) window.dispatchEvent(new Event('vettrack:access-changed'))
+    const body = await response.json().catch(() => null)
+    throw new ApiError(body?.error || 'No se pudo descargar el documento.', response.status)
+  }
+  const url = URL.createObjectURL(await response.blob())
+  const link = document.createElement('a')
+  link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}

@@ -147,7 +147,7 @@ function Pacientes() {
             <thead><tr><th scope="col">Nombre</th><th scope="col">Especie</th><th scope="col">Raza</th><th scope="col">Sexo</th><th scope="col">Propietario</th><th scope="col">Acciones</th></tr></thead>
             <tbody>{filtered.map(paciente => <tr key={paciente.id_mascota}>
               <td><strong>{paciente.nombre}</strong></td><td>{paciente.especie || 'Sin registrar'}</td><td>{paciente.raza || '—'}</td><td>{paciente.sexo || 'Sin registrar'}</td><td>{paciente.propietario?.nombre || 'No disponible'}</td>
-              <td><div className="dueno-actions">{can('pacientes.editar') && <button type="button" aria-label={`Editar ${paciente.nombre}`} disabled={!propietarios.length || Boolean(ownersError)} onClick={() => openEditor(paciente)}>Editar</button>}
+              <td><div className="dueno-actions">{can('expediente.ver') && <button type="button" onClick={() => { window.location.hash = `/expediente?paciente=${paciente.id_mascota}` }}>Ver expediente</button>}{can('pacientes.editar') && <button type="button" aria-label={`Editar ${paciente.nombre}`} disabled={!propietarios.length || Boolean(ownersError)} onClick={() => openEditor(paciente)}>Editar</button>}
                 {can('pacientes.eliminar') && <button type="button" className="danger" aria-label={`Eliminar ${paciente.nombre}`} onClick={() => { focusReturn.current = document.activeElement as HTMLElement; setModalError(''); setEliminando(paciente) }}>Eliminar</button>}</div></td>
             </tr>)}</tbody>
           </table></div>}

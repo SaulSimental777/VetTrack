@@ -16,12 +16,18 @@ import './App.css'
 const Medicos = lazy(() => import('./pages/Medicos'))
 const Servicios = lazy(() => import('./pages/Servicios'))
 const Citas = lazy(() => import('./pages/Citas'))
+const Clinica = lazy(() => import('./pages/Clinica'))
+const Expediente = lazy(() => import('./pages/Expediente'))
+const OrdenesRecepcion = lazy(() => import('./pages/OrdenesRecepcion'))
 
 const clinicRoutes = [
   { path: '/dashboard', title: 'Dashboard', permission: 'dashboard.ver', icon: '▦' },
   { path: '/propietarios', title: 'Propietarios', permission: 'propietarios.ver', icon: '♙' },
   { path: '/pacientes', title: 'Pacientes', permission: 'pacientes.ver', icon: '♧' },
   { path: '/citas', title: 'Citas', permission: 'citas.ver', icon: '▣' },
+  { path: '/clinica', title: 'Consultas', permission: 'consultas.ver', icon: '✚' },
+  { path: '/expediente', title: 'Expediente', permission: 'expediente.ver', icon: '▤' },
+  { path: '/ordenes-recepcion', title: 'Órdenes de recepción', permission: 'orden_recepcion.ver', icon: '▧' },
   { path: '/medicos', title: 'Médicos', permission: 'medicos.ver', icon: '✚' },
   { path: '/servicios', title: 'Servicios', permission: 'servicios.ver', icon: '◆' },
   { path: '/configuracion/usuarios', title: 'Usuarios', permission: 'usuarios.ver', icon: '⚙' },
@@ -179,7 +185,6 @@ function ClinicWorkspace({ session }: { session: Session }) {
           </button>
         </div>)}
         {[
-          ['diagnosticos.ver', 'Diagnósticos', '✚'],
           ['inventario.ver', 'Inventario', '□'], ['pagos.ver', 'Pagos', '$'],
         ].filter(([permission]) => can(permission)).map(([permission, label, icon]) => <button key={permission} type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">{icon}</span><span className="nav-label">{label}</span></button>)}
       </>
@@ -193,6 +198,9 @@ function ClinicWorkspace({ session }: { session: Session }) {
           : path === '/medicos' ? <Medicos />
           : path === '/servicios' ? <Servicios />
           : path === '/citas' ? <Citas />
+          : path === '/clinica' ? <Clinica />
+          : path === '/expediente' ? <Expediente />
+          : path === '/ordenes-recepcion' ? <OrdenesRecepcion />
           : <Dashboard clinicId={access.id_veterinaria} clinicName={access.nombre_veterinaria} />}
         </Suspense>
       </div>

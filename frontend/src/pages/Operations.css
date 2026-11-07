@@ -32,3 +32,13 @@
 .operations-status.cancelada,
 .operations-status.no_asistio { color: #8f5252; background: #f8eeee; }
 @media (max-width: 600px) { .operations-week { grid-template-columns: 1fr; padding: 15px; } .operations-toolbar { padding: 16px; } .operations-toolbar .users-field { width: 100%; min-width: 0; flex-basis: 100%; } .operations-service-option { align-items: flex-start; flex-direction: column; } }
+.clinical-card { padding: 22px; margin-bottom: 20px; }
+.clinical-card h4 { margin: 0 0 12px; }
+.clinical-card .users-form-grid { margin-bottom: 20px; }
+.clinical-summary { display: grid; gap: 10px; margin: 10px 0; }
+.clinical-summary > div { display: grid; grid-template-columns: minmax(120px, 180px) 1fr; gap: 14px; }
+.clinical-summary dt { color: #536d66; font-size: 13px; }
+.clinical-summary dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.clinical-entry { padding: 12px 0; border-bottom: 1px solid #e4ece8; }
+.clinical-selected { outline: 2px solid #2e9065; }
+@media (max-width: 620px) { .clinical-summary > div { grid-template-columns: 1fr; gap: 3px; } .clinical-card { padding: 16px; } }

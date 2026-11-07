@@ -12,6 +12,7 @@ const sesionRoutes = require('./routes/sesion.routes')
 const medicosRoutes = require('./routes/medicos.routes')
 const serviciosRoutes = require('./routes/servicios.routes')
 const citasRoutes = require('./routes/citas.routes')
+const clinicalRoutes = require('./routes/clinical.routes')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -22,7 +23,7 @@ app.use(
   })
 )
 
-app.use(express.json())
+app.use(express.json({ limit: '512kb' }))
 
 app.get('/', (req, res) => {
   res.json({
@@ -46,6 +47,13 @@ app.use('/api/sesion', sesionRoutes)
 app.use('/api/medicos', medicosRoutes)
 app.use('/api/servicios', serviciosRoutes)
 app.use('/api/citas', citasRoutes)
+app.use('/api/clinica', clinicalRoutes)
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error)
+  if (error.type === 'entity.too.large') return res.status(413).json({ error: 'Los datos enviados superan el tamaño permitido.' })
+  if (error instanceof SyntaxError && error.status === 400) return res.status(400).json({ error: 'El cuerpo JSON no es válido.' })
+  return res.status(500).json({ error: 'Error interno de la API.' })
+})
 
 if (require.main === module) {
   app.listen(PORT, () => {

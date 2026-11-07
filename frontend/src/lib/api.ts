@@ -5,9 +5,13 @@ const API_URL =
 
 export class ApiError extends Error {
   readonly status: number
-  constructor(message: string, status: number) {
+  readonly syncPending: boolean
+  readonly cleanupPending: boolean
+  constructor(message: string, status: number, details?: { syncPending?: unknown; cleanupPending?: unknown } | null) {
     super(message)
     this.status = status
+    this.syncPending = details?.syncPending === true
+    this.cleanupPending = details?.cleanupPending === true
   }
 }
 
@@ -54,7 +58,8 @@ export async function apiFetch<T>(
     throw new ApiError(
       data?.error ||
       `Error HTTP ${response.status}`,
-      response.status
+      response.status,
+      data
     )
   }
 

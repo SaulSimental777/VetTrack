@@ -45,9 +45,10 @@ const target = '30000000-0000-4000-8000-000000000001'
 const specialty = '40000000-0000-4000-8000-000000000001'
 const stateNonce = '50000000-0000-4000-8000-000000000001'
 let nextRandomUUID = target
+let uuidQueue = []
 const crypto = require('node:crypto')
 const originalUUID = crypto.randomUUID
-crypto.randomUUID = () => nextRandomUUID
+crypto.randomUUID = () => uuidQueue.length ? uuidQueue.shift() : nextRandomUUID
 const handlers = require('../controllers/usuarios.controller')
 crypto.randomUUID = originalUUID
 const specialties = require('../controllers/especialidades.controller')
@@ -80,7 +81,7 @@ const permisos = { rol: 'recepcionista', permisos_rol: ['pacientes.ver'], overri
 const planCatalog = () => plan('table', 'permiso', { data: catalog, error: null })
 const noSecrets = value => assert.doesNotMatch(JSON.stringify(value), /private upstream|supersecret|service_role|access_token|refresh_token|password_hash/)
 
-beforeEach(() => { state.planned = []; state.calls = []; nextRandomUUID = target })
+beforeEach(() => { state.planned = []; state.calls = []; nextRandomUUID = target; uuidQueue = [] })
 
 const issueCapability = (activo, result = { error: null }) => {
   nextRandomUUID = stateNonce
@@ -108,7 +109,7 @@ test('create rejects unexpected tenant/global fields, invalid types, limits, IDs
     body({ especialidades: ['not-uuid'] }), body({ especialidades: [specialty], rol: 'admin' }),
     body({ especialidades: [specialty, specialty], rol: 'medico' }),
   ].map(value => value && !Array.isArray(value) ? { ...value, passwordTemporal: 'StrongPassword12!' } : value)
-  invalid.push(...['Short1!', 'lowercasepassword12!', 'UPPERCASEPASSWORD12!', 'NoDigitsPassword!', 'NoSymbolsPassword12', 123456789012].map(passwordTemporal => body({ passwordTemporal })))
+  invalid.push(...['Short1!', 'lowercasepassword12!', 'UPPERCASEPASSWORD12!', 'NoDigitsPassword!', 123456789012].map(passwordTemporal => body({ passwordTemporal })))
   for (const invalidBody of invalid) {
     const res = response()
     await handlers.crearUsuario(request(invalidBody), res)
@@ -131,7 +132,7 @@ test('create derives trusted metadata from clinic access, preserves Unicode pass
   const res = response()
   await handlers.crearUsuario(request(body({ passwordTemporal })), res)
   assert.equal(res.statusCode, 201)
-  assert.deepEqual(res.body.usuario, { id: target, nombre: 'Persona', correo: 'persona@example.com', telefono: null, rol: 'recepcionista', activo: true, especialidades: [] })
+  assert.deepEqual(res.body.usuario, { id: target, nombre: 'Persona', correo: 'persona@example.com', telefono: null, rol: 'recepcionista', activo: true, especialidades: [], creado_en: null, ultimo_acceso: null })
   assert.ok(!JSON.stringify(res.body).includes(passwordTemporal))
   assert.ok(!JSON.stringify(res.body).includes('app_metadata'))
   assert.equal(state.planned.length, 0)
@@ -479,4 +480,267 @@ test('specialty routes permit delegated selectors while enforcing create and edi
     middleware(request(null, { clinicAccess: { permisos: [permission] } }), response(), () => { allowed = true })
     assert.equal(allowed, true)
   }
+})
+
+for (const [description, password] of [
+  ['seven characters', 'Vettra1'],
+  ['missing uppercase', 'vettrack1'],
+  ['missing lowercase', 'VETTRACK1'],
+  ['missing number', 'Vettrack'],
+]) {
+  test(`new password policy rejects ${description} for creation and password changes`, async () => {
+    for (const [handler, input] of [
+      ['crearUsuario', body({ passwordTemporal: password })], ['cambiarPassword', { nuevaPassword: password }],
+    ]) {
+      const res = response()
+      await handlers[handler](request(input), res)
+      assert.equal(res.statusCode, 400)
+      assert.equal(res.body.error, 'Mínimo 8 caracteres, con mayúscula, minúscula y número.')
+      assert.equal(state.calls.length, 0)
+    }
+  })
+}
+
+for (const password of ['Vettrak1', 'Vettrack1', 'Vettrak1!', 'Ábcdefg١']) {
+  test(`eight-plus character password is accepted with optional symbols: ${password}`, async () => {
+    plan('auth', 'createUser', { data: { user: authUser() }, error: null }, ([input]) => {
+      assert.equal(input.password, password)
+      assert.equal(Object.hasOwn(input, 'ban_duration'), false)
+    })
+    plan('rpc', 'vettrack_crear_usuario', { data: profile(), error: null })
+    const creation = response()
+    await handlers.crearUsuario(request(body({ passwordTemporal: password })), creation)
+    assert.equal(creation.statusCode, 201)
+    guard('usuarios.editar')
+    plan('auth', 'updateUserById', { error: null }, ([id, input]) => {
+      assert.equal(id, target)
+      assert.deepEqual(input, { password })
+    })
+    const change = response()
+    await handlers.cambiarPassword(request({ nuevaPassword: password }), change)
+    assert.equal(change.statusCode, 200)
+    assert.equal(state.planned.length, 0)
+  })
+}
+
+test('creation and editing reject incomplete or malformed email domains before Auth', async () => {
+  for (const correo of ['lupe@veterinaria', 'lupe@veterinaria.', 'lupe@.com', 'lupe@vet..com', 'lupe@-vet.com', 'lupe@vet-.com', 'lupe@vet_com.mx', 'lupe..martinez@vet.com', 'lu pe@vet.com']) {
+    for (const handler of ['crearUsuario', 'editarUsuario']) {
+      const res = response()
+      await handlers[handler](request(body({ correo, ...(handler === 'crearUsuario' ? { passwordTemporal: 'Vettrack1' } : {}) })), res)
+      assert.equal(res.statusCode, 400, `${handler}: ${correo}`)
+      assert.match(res.body.error, /correo válido/)
+      assert.equal(state.calls.length, 0)
+    }
+  }
+})
+
+test('a complete veterinary email and explicit active state are accepted', async () => {
+  plan('auth', 'createUser', { data: { user: authUser({ email: 'lupe@veterinaria.com' }) }, error: null }, ([input]) => {
+    assert.equal(input.email, 'lupe@veterinaria.com')
+    assert.equal(Object.hasOwn(input, 'ban_duration'), false)
+  })
+  plan('rpc', 'vettrack_crear_usuario', { data: profile(), error: null })
+  const res = response()
+  await handlers.crearUsuario(request(body({ correo: 'lupe@veterinaria.com', passwordTemporal: 'Vettrack1', activo: true })), res)
+  assert.equal(res.statusCode, 201)
+  assert.equal(res.body.usuario.activo, true)
+})
+
+test('creation and editing require boolean state values', async () => {
+  for (const activo of ['false', null, 0, [], {}]) {
+    for (const handler of ['crearUsuario', 'editarUsuario']) {
+      const input = body({ activo, ...(handler === 'crearUsuario' ? { passwordTemporal: 'Vettrack1' } : {}) })
+      const res = response()
+      await handlers[handler](request(input), res)
+      assert.equal(res.statusCode, 400)
+      assert.equal(state.calls.length, 0)
+    }
+  }
+})
+
+test('creating inactive accounts requires the existing state permission before any writes', async () => {
+  const req = request(body({ activo: false, passwordTemporal: 'Vettrack1' }))
+  req.clinicAccess.permisos = ['usuarios.crear']
+  const res = response()
+  await handlers.crearUsuario(req, res)
+  assert.equal(res.statusCode, 403)
+  assert.deepEqual(state.calls, [])
+})
+
+function planInactiveCreation(stateError = null, cleanupError = null) {
+  uuidQueue = [target, stateNonce]
+  plan('auth', 'createUser', { data: { user: authUser() }, error: null }, ([input]) => {
+    assert.equal(input.id, target)
+    assert.equal(input.ban_duration, '876000h', 'Auth is blocked before the profile is created')
+  })
+  plan('rpc', 'vettrack_crear_usuario', { data: profile(), error: null })
+  guard('usuarios.desactivar')
+  issueCapability(false)
+  plan('rpc', 'vettrack_estado_usuario', { data: stateError ? null : profile({ activo: false }), error: stateError }, args => {
+    assert.deepEqual(args, { p_id: target, p_activo: false, p_token: stateNonce })
+  })
+  if (!stateError) plan('auth', 'updateUserById', { error: null }, args => assert.deepEqual(args, [target, { ban_duration: '876000h' }]))
+  clearCapability()
+  if (stateError) plan('auth', 'deleteUser', { error: cleanupError }, args => assert.deepEqual(args, [target]))
+}
+
+test('inactive creation blocks Auth from the start and reuses the protected state transition', async () => {
+  planInactiveCreation()
+  const res = response()
+  await handlers.crearUsuario(request(body({ activo: false, passwordTemporal: 'Vettrack1' })), res)
+  assert.equal(res.statusCode, 201)
+  assert.equal(res.body.usuario.activo, false)
+  assert.equal(state.calls.filter(call => call.name === 'vettrack_estado_usuario').length, 1)
+  assert.equal(state.planned.length, 0)
+  noSecrets(res.body)
+})
+
+test('a failed inactive creation removes its new Auth user and profile through cascade', async () => {
+  planInactiveCreation({ code: '23514' })
+  const res = response()
+  await handlers.crearUsuario(request(body({ activo: false, passwordTemporal: 'Vettrack1' })), res)
+  assert.equal(res.statusCode, 409)
+  assert.equal(state.calls.at(-1).name, 'deleteUser')
+  assert.equal(state.planned.length, 0)
+})
+
+test('failed inactive-creation cleanup reports a controlled pending result', async () => {
+  planInactiveCreation({ code: '42501' }, { message: 'private upstream' })
+  const original = console.error
+  console.error = () => {}
+  const res = response()
+  try { await handlers.crearUsuario(request(body({ activo: false, passwordTemporal: 'Vettrack1' })), res) } finally { console.error = original }
+  assert.equal(res.statusCode, 502)
+  assert.equal(res.body.cleanupPending, true)
+  assert.equal(state.planned.length, 0)
+  noSecrets(res.body)
+})
+
+test('the editor reuses the protected deactivation flow after saving profile data', async () => {
+  guard('usuarios.editar')
+  guard('usuarios.desactivar')
+  plan('rpc', 'vettrack_editar_usuario', { data: profile({ nombre: 'Editada' }), error: null })
+  guard('usuarios.desactivar', profile({ nombre: 'Editada' }))
+  issueCapability(false)
+  plan('rpc', 'vettrack_estado_usuario', { data: profile({ nombre: 'Editada', activo: false }), error: null })
+  plan('auth', 'updateUserById', { error: null })
+  clearCapability()
+  const res = response()
+  await handlers.editarUsuario(request(body({ nombre: 'Editada', activo: false })), res)
+  assert.equal(res.statusCode, 200)
+  assert.equal(res.body.usuario.nombre, 'Editada')
+  assert.equal(res.body.usuario.activo, false)
+  assert.equal(state.calls.filter(call => call.name === 'vettrack_estado_usuario').length, 1)
+  assert.equal(state.planned.length, 0)
+})
+
+test('the editor cannot bypass the state permission or self-deactivation protection', async () => {
+  guard('usuarios.editar')
+  const restricted = request(body({ activo: false }))
+  restricted.clinicAccess.permisos = ['usuarios.editar']
+  const denied = response()
+  await handlers.editarUsuario(restricted, denied)
+  assert.equal(denied.statusCode, 403)
+  assert.equal(state.calls.some(call => call.name === 'vettrack_editar_usuario'), false)
+
+  guard('usuarios.editar', profile({ rol: 'admin' }))
+  const self = request(body({ rol: 'admin', activo: false }))
+  self.clinicAccess.id = target
+  const conflict = response()
+  await handlers.editarUsuario(self, conflict)
+  assert.equal(conflict.statusCode, 409)
+  assert.equal(state.calls.some(call => call.name === 'vettrack_editar_usuario'), false)
+})
+
+test('editing an inactive account reactivates Auth and profile through the same state flow', async () => {
+  guard('usuarios.editar', profile({ activo: false }))
+  guard('usuarios.desactivar', profile({ activo: false }))
+  plan('rpc', 'vettrack_editar_usuario', { data: profile({ activo: false }), error: null })
+  guard('usuarios.desactivar', profile({ activo: false }))
+  issueCapability(true)
+  plan('auth', 'updateUserById', { error: null }, args => assert.deepEqual(args, [target, { ban_duration: 'none' }]))
+  plan('rpc', 'vettrack_estado_usuario', { data: profile({ activo: true }), error: null }, args => assert.deepEqual(args, { p_id: target, p_activo: true, p_token: stateNonce }))
+  clearCapability()
+  const res = response()
+  await handlers.editarUsuario(request(body({ activo: true })), res)
+  assert.equal(res.statusCode, 200)
+  assert.equal(res.body.usuario.activo, true)
+  assert.equal(state.planned.length, 0)
+})
+
+test('the contextual reactivation action uses Auth unban before profile activation', async () => {
+  guard('usuarios.desactivar', profile({ activo: false }))
+  issueCapability(true)
+  plan('auth', 'updateUserById', { error: null }, args => assert.deepEqual(args, [target, { ban_duration: 'none' }]))
+  plan('rpc', 'vettrack_estado_usuario', { data: profile({ activo: true }), error: null })
+  clearCapability()
+  const res = response()
+  await handlers.cambiarEstado(request({ activo: true }), res)
+  assert.equal(res.statusCode, 200)
+  assert.equal(res.body.usuario.activo, true)
+  assert.equal(state.planned.length, 0)
+  noSecrets(res.body)
+})
+
+test('a partial editor state failure is explicit and never retries profile changes', async () => {
+  guard('usuarios.editar')
+  guard('usuarios.desactivar')
+  plan('rpc', 'vettrack_editar_usuario', { data: profile(), error: null })
+  guard('usuarios.desactivar')
+  issueCapability(false)
+  plan('rpc', 'vettrack_estado_usuario', { data: null, error: { code: '23514' } })
+  clearCapability()
+  const res = response()
+  await handlers.editarUsuario(request(body({ activo: false })), res)
+  assert.equal(res.statusCode, 502)
+  assert.equal(res.body.syncPending, true)
+  assert.equal(state.calls.filter(call => call.name === 'vettrack_editar_usuario').length, 1)
+  assert.equal(state.planned.length, 0)
+})
+
+test('last access is an allowlisted Auth field returned only after view and tenant authorization', async () => {
+  const created = '2026-11-07T01:00:00'
+  const signedIn = '2026-11-07T01:35:00Z'
+  const sensitive = authUser({ last_sign_in_at: signedIn, identities: [{ secret: 'supersecret' }], refresh_token: 'supersecret', providers: ['internal'], app_metadata: { internal: 'supersecret' } })
+  plan('table', 'perfilusuario', { data: [profile({ creado_en: created })], error: null })
+  guard('usuarios.ver', profile({ creado_en: created }), sensitive)
+  const res = response()
+  await handlers.obtenerUsuarios(request(), res)
+  assert.equal(res.statusCode, 200)
+  assert.equal(res.body[0].creado_en, created)
+  assert.equal(res.body[0].ultimo_acceso, signedIn)
+  assert.deepEqual(Object.keys(res.body[0]).sort(), ['id', 'nombre', 'correo', 'telefono', 'rol', 'activo', 'especialidades', 'creado_en', 'ultimo_acceso'].sort())
+  noSecrets(res.body)
+  assert.doesNotMatch(JSON.stringify(res.body), /identities|providers|app_metadata/)
+})
+
+test('user listing without usuarios.ver never reads Auth last access', async () => {
+  const req = request()
+  req.clinicAccess.permisos = ['usuarios.editar']
+  const res = response()
+  await handlers.obtenerUsuarios(req, res)
+  assert.equal(res.statusCode, 403)
+  assert.deepEqual(state.calls, [])
+})
+
+test('a foreign-tenant row cannot cause a privileged last-access lookup', async () => {
+  plan('table', 'perfilusuario', { data: [profile({ id_veterinaria: otherTenant })], error: null })
+  plan('rpc', 'vettrack_autorizar_usuario', { data: profile({ id_veterinaria: otherTenant }), error: null })
+  const res = response()
+  await handlers.obtenerUsuarios(request(), res)
+  assert.equal(res.statusCode, 200)
+  assert.deepEqual(res.body, [])
+  assert.ok(state.calls.every(call => call.kind !== 'auth'))
+})
+
+test('editing without usuarios.ver never exposes last access', async () => {
+  guard('usuarios.editar', profile(), authUser({ last_sign_in_at: '2026-11-07T01:35:00Z' }))
+  plan('rpc', 'vettrack_editar_usuario', { data: profile(), error: null })
+  const req = request(body())
+  req.clinicAccess.permisos = ['usuarios.editar']
+  const res = response()
+  await handlers.editarUsuario(req, res)
+  assert.equal(res.statusCode, 200)
+  assert.equal(res.body.usuario.ultimo_acceso, null)
 })

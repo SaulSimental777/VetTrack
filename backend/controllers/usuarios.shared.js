@@ -23,12 +23,25 @@ const texto = (valor, campo, maximo, obligatorio = true) => {
   return valor.trim() || null
 }
 const validarPassword = password => {
-  if (typeof password !== 'string' || [...password].length < 12 ||
+  if (typeof password !== 'string' || [...password].length < 8 ||
     !/\p{Lu}/u.test(password) || !/\p{Ll}/u.test(password) ||
-    !/\p{Nd}/u.test(password) || !/[^\p{L}\p{N}\s]/u.test(password)) {
-    fallar(400, 'La contraseña debe tener al menos 12 caracteres, mayúscula, minúscula, dígito y símbolo')
+    !/\p{Nd}/u.test(password)) {
+    fallar(400, 'Mínimo 8 caracteres, con mayúscula, minúscula y número.')
   }
   return password
+}
+
+const correoValido = value => {
+  if (typeof value !== 'string') return false
+  const email = value.trim()
+  const parts = email.split('@')
+  if ([...email].length > 100 || parts.length !== 2) return false
+  const [local, domain] = parts
+  const labels = domain.split('.')
+  return [...local].length <= 64 && /^[\p{L}\p{M}\p{N}!#$%&'*+/=?^_`{|}~.-]+$/u.test(local) &&
+    !local.startsWith('.') && !local.endsWith('.') && !local.includes('..') &&
+    labels.length >= 2 && /^[A-Za-z]{2,63}$/.test(labels.at(-1)) &&
+    labels.every(label => /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label))
 }
 
 const comprobarBD = (resultado, mensaje = 'No se pudo completar la operación de usuarios') => {
@@ -63,4 +76,4 @@ const responderError = (res, error) => {
   return res.status(500).json({ error: 'Error interno al administrar usuarios' })
 }
 
-module.exports = { ErrorUsuarios, fallar, esObjeto, uuidValido, validarId, validarCampos, texto, validarPassword, comprobarBD, filaRPC, responderError }
+module.exports = { ErrorUsuarios, fallar, esObjeto, uuidValido, validarId, validarCampos, texto, validarPassword, correoValido, comprobarBD, filaRPC, responderError }

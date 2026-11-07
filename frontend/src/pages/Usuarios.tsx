@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { apiFetch } from '../lib/api'
+import { ApiError, apiFetch } from '../lib/api'
 import { usePermissions } from '../lib/permissions'
 import './Usuarios.css'
 
@@ -14,6 +14,8 @@ interface Usuario {
   rol: Role
   activo: boolean
   especialidades: Especialidad[]
+  creado_en: string | null
+  ultimo_acceso: string | null
 }
 interface UsuarioResponse { message: string; usuario: Usuario }
 interface Permiso { clave: string; modulo: string; accion: string; descripcion: string }
@@ -31,10 +33,32 @@ const moduleLabels: Record<string, string> = {
   recetas: 'Recetas', servicios: 'Servicios', horarios: 'Horarios', inventario: 'Inventario',
   proveedores: 'Proveedores', compras: 'Compras', pagos: 'Pagos', reportes: 'Reportes', configuracion: 'Configuración',
 }
-const passwordHelp = 'Mínimo 12 caracteres, con mayúscula, minúscula, número y símbolo.'
-const strongPassword = (value: string) => [...value].length >= 12 && /\p{Lu}/u.test(value) && /\p{Ll}/u.test(value) && /\p{Nd}/u.test(value) && /[^\p{L}\p{N}\s]/u.test(value)
+const passwordHelp = 'Mínimo 8 caracteres, con mayúscula, minúscula y número.'
+const strongPassword = (value: string) => [...value].length >= 8 && /\p{Lu}/u.test(value) && /\p{Ll}/u.test(value) && /\p{Nd}/u.test(value)
+const validEmail = (value: string) => {
+  const email = value.trim()
+  const parts = email.split('@')
+  if ([...email].length > 100 || parts.length !== 2) return false
+  const [local, domain] = parts
+  const labels = domain.split('.')
+  return [...local].length <= 64 && /^[\p{L}\p{M}\p{N}!#$%&'*+/=?^_`{|}~.-]+$/u.test(local) && !local.startsWith('.') && !local.endsWith('.') && !local.includes('..') &&
+    labels.length >= 2 && /^[A-Za-z]{2,63}$/.test(labels.at(-1) || '') && labels.every(label => /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label))
+}
 const errorMessage = (cause: unknown, fallback: string) => cause instanceof Error ? cause.message : fallback
 const userName = (usuario: Usuario) => usuario.nombre || usuario.correo || 'Usuario sin nombre'
+const partialFailure = (cause: unknown) => cause instanceof ApiError && (cause.syncPending || cause.cleanupPending)
+const dateFormat = new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Tijuana', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+const userDate = (value: string | null, withTime = false) => {
+  if (!value) return withTime ? 'Sin accesos' : '—'
+  let normalized = value.trim().replace(' ', 'T')
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) normalized += 'T00:00:00'
+  if (!/(?:Z|[+-]\d{2}(?::?\d{2})?)$/i.test(normalized)) normalized += 'Z'
+  normalized = normalized.replace(/([+-]\d{2})$/, '$1:00').replace(/([+-]\d{2})(\d{2})$/, '$1:$2')
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) return '—'
+  const parts = Object.fromEntries(dateFormat.formatToParts(date).map(part => [part.type, part.value]))
+  return `${parts.day}/${parts.month}/${parts.year}${withTime ? ` ${parts.hour}:${parts.minute}` : ''}`
+}
 
 // Every modal owns its requests and sensitive fields. Unmounting aborts pending
 // work and discards the password instead of retaining it in the users page.
@@ -60,12 +84,13 @@ function useMutation() {
   return { pending, start, finish }
 }
 
-function UserDialog({ title, children, pending, onClose, wide = false }: {
+function UserDialog({ title, children, pending, onClose, wide = false, headerStatus }: {
   title: string
   children: ReactNode
   pending: boolean
   onClose: () => void
   wide?: boolean
+  headerStatus?: ReactNode
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
@@ -85,7 +110,7 @@ function UserDialog({ title, children, pending, onClose, wide = false }: {
     <dialog ref={ref} className={`users-dialog${wide ? ' users-dialog-wide' : ''}`} aria-labelledby={titleId} aria-busy={pending}
       onCancel={event => { event.preventDefault(); if (!pending) onClose() }}>
       <div className="users-dialog-header">
-        <div><span className="eyebrow">Administración de la clínica</span><h3 id={titleId}>{title}</h3></div>
+        <div><span className="eyebrow">Administración de la clínica</span><h3 id={titleId}>{title}</h3>{headerStatus && <div className="users-dialog-status">{headerStatus}</div>}</div>
         <button type="button" className="users-close" aria-label="Cerrar ventana" onClick={onClose} disabled={pending}>×</button>
       </div>
       {children}
@@ -106,31 +131,53 @@ function PasswordFields({ password, confirmation, onPassword, onConfirmation, pr
   onConfirmation: (value: string) => void
   prefix: string
 }) {
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmation, setShowConfirmation] = useState(false)
+  const confirmationVisible = Boolean(password && confirmation)
+  const matching = password === confirmation
+  const passwordLabel = prefix === 'new-user' ? 'Contraseña temporal' : 'Nueva contraseña'
+  const confirmationLabel = prefix === 'new-user' ? 'Confirmar contraseña' : 'Confirmar nueva contraseña'
+
   return (
+    <>
     <div className="users-form-grid">
       <div className="users-field">
-        <label htmlFor={`${prefix}-password`}>{prefix === 'new-user' ? 'Contraseña temporal' : 'Nueva contraseña'} *</label>
-        <input id={`${prefix}-password`} type="password" autoComplete="new-password" value={password} onChange={event => onPassword(event.target.value)} minLength={12} maxLength={128} aria-describedby={`${prefix}-password-help`} required />
+        <label htmlFor={`${prefix}-password`}>{passwordLabel} *</label>
+        <div className="users-password-control">
+          <input id={`${prefix}-password`} type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={password} onChange={event => onPassword(event.target.value)} minLength={8} maxLength={128} aria-describedby={`${prefix}-password-help`} required />
+          <button type="button" className="users-password-toggle" aria-label={`${showPassword ? 'Ocultar' : 'Mostrar'} ${passwordLabel.toLocaleLowerCase('es')}`} aria-pressed={showPassword} aria-controls={`${prefix}-password`} onMouseDown={event => event.preventDefault()} onClick={() => setShowPassword(previous => !previous)}><EyeIcon visible={showPassword} /></button>
+        </div>
         <small id={`${prefix}-password-help`}>{passwordHelp}</small>
       </div>
       <div className="users-field">
-        <label htmlFor={`${prefix}-confirmation`}>Confirmar contraseña *</label>
-        <input id={`${prefix}-confirmation`} type="password" autoComplete="new-password" value={confirmation} onChange={event => onConfirmation(event.target.value)} minLength={12} maxLength={128} required />
+        <label htmlFor={`${prefix}-confirmation`}>{confirmationLabel} *</label>
+        <div className="users-password-control">
+          <input id={`${prefix}-confirmation`} type={showConfirmation ? 'text' : 'password'} autoComplete="new-password" value={confirmation} onChange={event => onConfirmation(event.target.value)} minLength={8} maxLength={128} aria-invalid={confirmationVisible && !matching ? true : undefined} aria-describedby={`${prefix}-match`} required />
+          <button type="button" className="users-password-toggle" aria-label={`${showConfirmation ? 'Ocultar' : 'Mostrar'} ${confirmationLabel.toLocaleLowerCase('es')}`} aria-pressed={showConfirmation} aria-controls={`${prefix}-confirmation`} onMouseDown={event => event.preventDefault()} onClick={() => setShowConfirmation(previous => !previous)}><EyeIcon visible={showConfirmation} /></button>
+        </div>
       </div>
     </div>
+    <p id={`${prefix}-match`} className={`users-password-feedback ${matching ? 'matching' : 'different'}`} aria-live="polite" aria-atomic="true">{confirmationVisible ? matching ? 'Las contraseñas coinciden.' : 'Las contraseñas no coinciden.' : ''}</p>
+    </>
   )
 }
 
-function UsuarioEditor({ usuario, selfId, isAdmin, lastAdmin, canCreateSpecialty, onClose, onSaved }: {
+function EyeIcon({ visible }: { visible: boolean }) {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />{visible && <path d="m3 3 18 18" />}</svg>
+}
+
+function UsuarioEditor({ usuario, selfId, isAdmin, lastAdmin, canCreateSpecialty, canChangeState, onClose, onSaved, onUnconfirmed }: {
   usuario: Usuario | null
   selfId: string
   isAdmin: boolean
   lastAdmin: boolean
   canCreateSpecialty: boolean
+  canChangeState: boolean
   onClose: () => void
   onSaved: (usuario: Usuario, message: string) => void
+  onUnconfirmed: () => void
 }) {
-  const [form, setForm] = useState({ nombre: usuario?.nombre || '', correo: usuario?.correo || '', telefono: usuario?.telefono || '', rol: usuario?.rol || 'recepcionista' as Role })
+  const [form, setForm] = useState({ nombre: usuario?.nombre || '', correo: usuario?.correo || '', telefono: usuario?.telefono || '', rol: usuario?.rol || 'recepcionista' as Role, activo: usuario?.activo ?? true })
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [selected, setSelected] = useState<string[]>(usuario?.especialidades.map(item => item.id_especialidad) || [])
@@ -146,6 +193,8 @@ function UsuarioEditor({ usuario, selfId, isAdmin, lastAdmin, canCreateSpecialty
   const specialtyMutation = useMutation()
   const pending = mutation.pending || specialtyMutation.pending
   const lockedRole = usuario?.id === selfId || lastAdmin
+  const lockedState = !canChangeState || usuario?.id === selfId || lastAdmin
+  const invalidEmail = Boolean(form.correo.trim()) && !validEmail(form.correo)
 
   useEffect(() => {
     if (form.rol !== 'medico' || especialidades !== null) return
@@ -187,6 +236,7 @@ function UsuarioEditor({ usuario, selfId, isAdmin, lastAdmin, canCreateSpecialty
     event.preventDefault()
     if (pending) return
     if (!form.nombre.trim() || !form.correo.trim()) { setError('Completa el nombre y el correo electrónico.'); return }
+    if (!validEmail(form.correo)) { setError('Ingresa un correo válido, por ejemplo nombre@veterinaria.com.'); return }
     if (!usuario && (!strongPassword(password) || password !== confirmation)) {
       setError(password !== confirmation ? 'Las contraseñas no coinciden.' : passwordHelp)
       return
@@ -200,14 +250,17 @@ function UsuarioEditor({ usuario, selfId, isAdmin, lastAdmin, canCreateSpecialty
       const result = await apiFetch<UsuarioResponse>(usuario ? `/api/usuarios/${usuario.id}` : '/api/usuarios', {
         method: usuario ? 'PUT' : 'POST', signal: controller.signal,
         body: JSON.stringify({ nombre: form.nombre.trim(), correo: form.correo.trim(), telefono: form.telefono.trim() || null,
-          rol: form.rol, especialidades: form.rol === 'medico' ? selected : [], ...(!usuario ? { passwordTemporal: password } : {}) }),
+          rol: form.rol, activo: form.activo, especialidades: form.rol === 'medico' ? selected : [], ...(!usuario ? { passwordTemporal: password } : {}) }),
       })
       if (controller.signal.aborted) return
       setPassword('')
       setConfirmation('')
-      onSaved(result.usuario, usuario ? 'Usuario actualizado.' : 'Usuario creado. Ya puede ingresar con su contraseña temporal.')
+      onSaved(result.usuario, usuario ? 'Usuario actualizado.' : result.usuario.activo ? 'Usuario creado. Ya puede ingresar con su contraseña temporal.' : 'Usuario creado como INACTIVO. Podrá ingresar cuando se reactive su cuenta.')
     } catch (cause) {
-      if (!controller.signal.aborted) setError(errorMessage(cause, 'No se pudo guardar el usuario.'))
+      if (!controller.signal.aborted) {
+        if (partialFailure(cause)) { setPassword(''); setConfirmation(''); onUnconfirmed() }
+        else setError(errorMessage(cause, 'No se pudo guardar el usuario.'))
+      }
     } finally { mutation.finish(controller) }
   }
 
@@ -219,13 +272,13 @@ function UsuarioEditor({ usuario, selfId, isAdmin, lastAdmin, canCreateSpecialty
   }
 
   return (
-    <UserDialog title={usuario ? 'Editar usuario' : 'Nuevo usuario'} pending={pending} onClose={close} wide>
+    <UserDialog title={usuario ? 'Editar usuario' : 'Nuevo usuario'} pending={pending} onClose={close} wide headerStatus={usuario && <>Estado actual: <span className={`users-state ${usuario.activo ? 'active' : 'inactive'}`}><span aria-hidden="true" />{usuario.activo ? 'ACTIVO' : 'INACTIVO'}</span></>}>
       <form onSubmit={save}>
         <div className="users-dialog-body">
           <fieldset disabled={pending} className="users-fields">
             <div className="users-form-grid">
               <div className="users-field"><label htmlFor="user-name">Nombre *</label><input id="user-name" data-initial-focus value={form.nombre} onChange={event => setForm(previous => ({ ...previous, nombre: event.target.value }))} maxLength={100} required /></div>
-              <div className="users-field"><label htmlFor="user-email">Correo *</label><input id="user-email" type="email" autoComplete="off" value={form.correo} onChange={event => setForm(previous => ({ ...previous, correo: event.target.value }))} maxLength={100} required /></div>
+              <div className="users-field"><label htmlFor="user-email">Correo *</label><input id="user-email" type="email" autoComplete="off" value={form.correo} onChange={event => setForm(previous => ({ ...previous, correo: event.target.value }))} maxLength={100} aria-invalid={invalidEmail ? true : undefined} aria-describedby={invalidEmail ? 'user-email-error' : undefined} required />{invalidEmail && <small id="user-email-error" className="users-field-error">Ingresa un correo válido, por ejemplo nombre@veterinaria.com.</small>}</div>
               <div className="users-field"><label htmlFor="user-phone">Teléfono</label><input id="user-phone" type="tel" value={form.telefono} onChange={event => setForm(previous => ({ ...previous, telefono: event.target.value }))} maxLength={20} /></div>
               <div className="users-field"><label htmlFor="user-role">Rol *</label>
                 <select id="user-role" value={form.rol} onChange={event => changeRole(event.target.value as Role)} disabled={lockedRole} required>
@@ -234,8 +287,9 @@ function UsuarioEditor({ usuario, selfId, isAdmin, lastAdmin, canCreateSpecialty
                 </select>
                 {lockedRole && <small>{usuario?.id === selfId ? 'No puedes cambiar tu propio rol.' : 'Debe conservarse al menos un administrador activo.'}</small>}
               </div>
+              <div className="users-field"><label htmlFor="user-state">Estado</label><select id="user-state" value={form.activo ? 'active' : 'inactive'} onChange={event => setForm(previous => ({ ...previous, activo: event.target.value === 'active' }))} disabled={lockedState}><option value="active">Activo</option><option value="inactive">Inactivo</option></select>{lockedState && <small>{!canChangeState ? 'No tienes permiso para cambiar el estado de la cuenta.' : usuario?.id === selfId ? 'No puedes cambiar el estado de tu propia cuenta.' : 'Debe conservarse al menos un administrador activo.'}</small>}</div>
             </div>
-            {!usuario && <PasswordFields password={password} confirmation={confirmation} onPassword={setPassword} onConfirmation={setConfirmation} prefix="new-user" />}
+            {!usuario && <PasswordFields password={password} confirmation={confirmation} onPassword={value => { setPassword(value); setError('') }} onConfirmation={value => { setConfirmation(value); setError('') }} prefix="new-user" />}
             {form.rol === 'medico' && (
               <section className="users-specialties" aria-labelledby="user-specialties-title">
                 <div className="users-specialties-heading"><h4 id="user-specialties-title">Especialidades médicas</h4>{canCreateSpecialty && <button type="button" className="users-link-button" onClick={() => setNewSpecialty(true)} disabled={!especialidades || pending || newSpecialty || selected.length >= 50}>+ Crear especialidad</button>}</div>
@@ -257,13 +311,13 @@ function UsuarioEditor({ usuario, selfId, isAdmin, lastAdmin, canCreateSpecialty
           </fieldset>
           {error && <p className="users-notice error" role="alert">{error}</p>}
         </div>
-        <div className="users-dialog-footer"><button type="button" className="users-secondary-button" onClick={close} disabled={pending}>Cancelar</button><button type="submit" className="primary-button" disabled={pending || newSpecialty || (form.rol === 'medico' && !especialidades)}>{mutation.pending ? 'Guardando…' : usuario ? 'Guardar cambios' : 'Crear usuario'}</button></div>
+        <div className="users-dialog-footer"><button type="button" className="users-secondary-button" onClick={close} disabled={pending}>Cancelar</button><button type="submit" className="primary-button" disabled={pending || newSpecialty || !form.nombre.trim() || !validEmail(form.correo) || (!usuario && (!strongPassword(password) || password !== confirmation)) || (form.rol === 'medico' && !especialidades)}>{mutation.pending ? 'Guardando…' : usuario ? 'Guardar cambios' : 'Crear usuario'}</button></div>
       </form>
     </UserDialog>
   )
 }
 
-function PasswordDialog({ usuario, onClose, onSaved }: { usuario: Usuario; onClose: () => void; onSaved: () => void }) {
+function PasswordDialog({ usuario, onClose, onSaved, onUnconfirmed }: { usuario: Usuario; onClose: () => void; onSaved: () => void; onUnconfirmed: () => void }) {
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [error, setError] = useState('')
@@ -290,23 +344,26 @@ function PasswordDialog({ usuario, onClose, onSaved }: { usuario: Usuario; onClo
       setConfirmation('')
       onSaved()
     } catch (cause) {
-      if (!controller.signal.aborted) setError(errorMessage(cause, 'No se pudo cambiar la contraseña.'))
+      if (!controller.signal.aborted) {
+        if (partialFailure(cause)) { setPassword(''); setConfirmation(''); onUnconfirmed() }
+        else setError(errorMessage(cause, 'No se pudo cambiar la contraseña.'))
+      }
     } finally { mutation.finish(controller) }
   }
   return (
     <UserDialog title="Cambiar contraseña" pending={mutation.pending} onClose={close} wide>
       <form onSubmit={save}>
         <div className="users-dialog-body"><p className="users-dialog-description">Define una nueva contraseña para <strong>{userName(usuario)}</strong>.</p>
-          <fieldset disabled={mutation.pending} className="users-fields"><PasswordFields password={password} confirmation={confirmation} onPassword={setPassword} onConfirmation={setConfirmation} prefix="change-user" /></fieldset>
+          <fieldset disabled={mutation.pending} className="users-fields"><PasswordFields password={password} confirmation={confirmation} onPassword={value => { setPassword(value); setError('') }} onConfirmation={value => { setConfirmation(value); setError('') }} prefix="change-user" /></fieldset>
           {error && <p className="users-notice error" role="alert">{error}</p>}
         </div>
-        <div className="users-dialog-footer"><button type="button" className="users-secondary-button" onClick={close} disabled={mutation.pending}>Cancelar</button><button type="submit" className="primary-button" disabled={mutation.pending}>{mutation.pending ? 'Guardando…' : 'Cambiar contraseña'}</button></div>
+        <div className="users-dialog-footer"><button type="button" className="users-secondary-button" onClick={close} disabled={mutation.pending}>Cancelar</button><button type="submit" className="primary-button" disabled={mutation.pending || !strongPassword(password) || password !== confirmation}>{mutation.pending ? 'Guardando…' : 'Cambiar contraseña'}</button></div>
       </form>
     </UserDialog>
   )
 }
 
-function EstadoDialog({ usuario, onClose, onSaved }: { usuario: Usuario; onClose: () => void; onSaved: (usuario: Usuario, message: string) => void }) {
+function EstadoDialog({ usuario, onClose, onSaved, onUnconfirmed }: { usuario: Usuario; onClose: () => void; onSaved: (usuario: Usuario, message: string) => void; onUnconfirmed: () => void }) {
   const [error, setError] = useState('')
   const mutation = useMutation()
   const save = async () => {
@@ -317,7 +374,10 @@ function EstadoDialog({ usuario, onClose, onSaved }: { usuario: Usuario; onClose
       const result = await apiFetch<UsuarioResponse>(`/api/usuarios/${usuario.id}/estado`, { method: 'PATCH', signal: controller.signal, body: JSON.stringify({ activo: !usuario.activo }) })
       if (!controller.signal.aborted) onSaved(result.usuario, usuario.activo ? 'Usuario desactivado.' : 'Usuario reactivado.')
     } catch (cause) {
-      if (!controller.signal.aborted) setError(errorMessage(cause, 'No se pudo cambiar el estado del usuario.'))
+      if (!controller.signal.aborted) {
+        if (partialFailure(cause)) onUnconfirmed()
+        else setError(errorMessage(cause, 'No se pudo cambiar el estado del usuario.'))
+      }
     } finally { mutation.finish(controller) }
   }
   return (
@@ -468,8 +528,16 @@ function Usuarios() {
   const saved = (usuario: Usuario, message: string) => {
     setList(previous => ({ identity, loading: false, error: previous.error, usuarios: [usuario, ...previous.usuarios.filter(item => item.id !== usuario.id)] }))
     setNotice(message)
+    setAccessError('')
     setDialog(null)
     if (usuario.id === access.id) refreshAccess()
+  }
+
+  const unconfirmed = () => {
+    setDialog(null)
+    setNotice('')
+    setAccessError('La operación quedó pendiente de revisión. Se recargó la lista para mostrar el estado actual; compruébalo antes de volver a guardar.')
+    reloadList()
   }
 
   if (!allowed) return <div className="users-forbidden" role="alert"><h3>403 · Acceso no autorizado</h3><p>No tienes permiso para consultar usuarios.</p></div>
@@ -487,14 +555,16 @@ function Usuarios() {
         {error && <p className="users-notice error" role="alert">{error}</p>}
         {!loading && !error && usuarios.length === 0 && <div className="users-empty"><h4>No hay usuarios registrados</h4><p>Las cuentas de esta clínica aparecerán aquí.</p></div>}
         {!loading && usuarios.length > 0 && filtered.length === 0 && <div className="users-empty"><h4>Sin coincidencias</h4><p>Prueba con otro nombre, correo o rol.</p></div>}
-        {filtered.length > 0 && <div className="users-table-scroll"><table className="users-table"><thead><tr><th scope="col">Usuario</th><th scope="col">Correo</th><th scope="col">Rol</th><th scope="col">Estado</th><th scope="col">Especialidad</th><th scope="col">Acciones</th></tr></thead><tbody>{filtered.map(usuario => {
+        {filtered.length > 0 && <div className="users-table-scroll"><table className="users-table"><thead><tr><th scope="col">Usuario</th><th scope="col">Correo</th><th scope="col">Rol</th><th scope="col">Estado</th><th scope="col">Especialidad</th><th scope="col">Creado</th><th scope="col">Último acceso</th><th scope="col">Acciones</th></tr></thead><tbody>{filtered.map(usuario => {
           const manageable = admin || usuario.rol !== 'admin'
           const self = usuario.id === access.id
           const lastAdmin = usuario.rol === 'admin' && usuario.activo && activeAdmins <= 1
           return <tr key={usuario.id}>
             <th scope="row"><div className="users-person"><div className="users-avatar" aria-hidden="true">{userName(usuario).charAt(0).toUpperCase()}</div><div><strong>{userName(usuario)}</strong>{self && <small>Tu cuenta</small>}</div></div></th>
-            <td>{usuario.correo || '—'}</td><td><span className={`users-role ${usuario.rol}`}>{roleLabels[usuario.rol]}</span></td><td><span className={`users-state ${usuario.activo ? 'active' : 'inactive'}`}><span aria-hidden="true" />{usuario.activo ? 'Activo' : 'Inactivo'}</span></td>
+            <td>{usuario.correo || '—'}</td><td><span className={`users-role ${usuario.rol}`}>{roleLabels[usuario.rol]}</span></td><td><span className={`users-state ${usuario.activo ? 'active' : 'inactive'}`}><span aria-hidden="true" />{usuario.activo ? 'ACTIVO' : 'INACTIVO'}</span></td>
             <td>{usuario.rol === 'medico' && usuario.especialidades.length ? <div className="users-specialty-tags">{usuario.especialidades.map(especialidad => <span key={especialidad.id_especialidad}>{especialidad.nombre}</span>)}</div> : '—'}</td>
+            <td className="users-date">{userDate(usuario.creado_en)}</td>
+            <td className="users-date">{userDate(usuario.ultimo_acceso, true)}</td>
             <td><div className="users-row-actions">
               {can('usuarios.editar') && manageable && <><button type="button" aria-label={`Editar a ${userName(usuario)}`} onClick={() => open({ tipo: 'editor', usuario })}><span aria-hidden="true">✎</span> Editar</button><button type="button" aria-label={`Cambiar contraseña de ${userName(usuario)}`} onClick={() => open({ tipo: 'password', usuario })}><UserActionIcon type="password" /> Contraseña</button></>}
               {can('usuarios.permisos') && admin && <button type="button" aria-label={`Permisos de ${userName(usuario)}`} disabled={usuario.rol === 'admin'} title={usuario.rol === 'admin' ? 'El administrador tiene todos los permisos de la clínica y no admite personalizaciones.' : 'Personalizar permisos'} onClick={() => open({ tipo: 'permisos', usuario })}><UserActionIcon type="key" /> Permisos</button>}
@@ -504,9 +574,9 @@ function Usuarios() {
           </tr>
         })}</tbody></table></div>}
       </section>
-      {activeDialog?.tipo === 'editor' && <UsuarioEditor usuario={activeDialog.usuario} selfId={access.id} isAdmin={admin} lastAdmin={Boolean(activeDialog.usuario?.rol === 'admin' && activeDialog.usuario.activo && activeAdmins <= 1)} canCreateSpecialty={can('usuarios.crear')} onClose={() => setDialog(null)} onSaved={saved} />}
-      {activeDialog?.tipo === 'password' && <PasswordDialog usuario={activeDialog.usuario} onClose={() => setDialog(null)} onSaved={() => { setNotice('Contraseña actualizada.'); setDialog(null) }} />}
-      {activeDialog?.tipo === 'estado' && <EstadoDialog usuario={activeDialog.usuario} onClose={() => setDialog(null)} onSaved={saved} />}
+      {activeDialog?.tipo === 'editor' && <UsuarioEditor usuario={activeDialog.usuario} selfId={access.id} isAdmin={admin} lastAdmin={Boolean(activeDialog.usuario?.rol === 'admin' && activeDialog.usuario.activo && activeAdmins <= 1)} canCreateSpecialty={can('usuarios.crear')} canChangeState={can('usuarios.desactivar')} onClose={() => setDialog(null)} onSaved={saved} onUnconfirmed={unconfirmed} />}
+      {activeDialog?.tipo === 'password' && <PasswordDialog usuario={activeDialog.usuario} onClose={() => setDialog(null)} onSaved={() => { setNotice('Contraseña actualizada.'); setDialog(null) }} onUnconfirmed={unconfirmed} />}
+      {activeDialog?.tipo === 'estado' && <EstadoDialog usuario={activeDialog.usuario} onClose={() => setDialog(null)} onSaved={saved} onUnconfirmed={unconfirmed} />}
       {activeDialog?.tipo === 'permisos' && <PermisosDialog usuario={activeDialog.usuario} onClose={() => setDialog(null)} onUpdated={() => { if (activeDialog.usuario.id === access.id) refreshAccess() }} />}
     </div>
   )

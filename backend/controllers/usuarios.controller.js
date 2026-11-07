@@ -2,18 +2,19 @@ const { randomUUID } = require('node:crypto')
 const { supabaseAdmin } = require('../config/supabase')
 const {
   ErrorUsuarios, fallar, esObjeto, uuidValido, validarId, validarCampos,
-  texto, validarPassword, comprobarBD, filaRPC, responderError,
+  texto, validarPassword, correoValido, comprobarBD, filaRPC, responderError,
 } = require('./usuarios.shared')
 
-const camposPerfil = 'id, nombre, telefono, rol, activo, id_veterinaria'
+const camposPerfil = 'id, nombre, telefono, rol, activo, id_veterinaria, creado_en'
 const roles = ['admin', 'recepcionista', 'medico']
 const duracionBloqueo = '876000h'
 
 const validarUsuario = (body, creacion, acceso) => {
-  validarCampos(body, ['nombre', 'correo', 'telefono', 'rol', 'especialidades', ...(creacion ? ['passwordTemporal', 'permisos'] : [])])
+  validarCampos(body, ['nombre', 'correo', 'telefono', 'rol', 'activo', 'especialidades', ...(creacion ? ['passwordTemporal', 'permisos'] : [])])
   const nombre = texto(body.nombre, 'El nombre', 100)
   const correo = texto(body.correo, 'El correo', 100).toLowerCase()
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) fallar(400, 'El correo debe ser válido')
+  if (!correoValido(correo)) fallar(400, 'Ingresa un correo válido, por ejemplo nombre@veterinaria.com.')
+  if (body.activo !== undefined && typeof body.activo !== 'boolean') fallar(400, 'El estado activo debe ser booleano')
   const telefono = texto(body.telefono, 'El teléfono', 20, false)
   if (!roles.includes(body.rol)) fallar(400, 'El rol debe ser admin, recepcionista o medico')
   if (body.rol === 'admin' && acceso.rol !== 'admin') fallar(403, 'Solo un administrador puede asignar el rol admin')
@@ -24,7 +25,7 @@ const validarUsuario = (body, creacion, acceso) => {
   if (new Set(especialidades.map(id => id.toLowerCase())).size !== especialidades.length) fallar(400, 'No se permiten especialidades repetidas')
   if (body.rol !== 'medico' && especialidades.length) fallar(400, 'Solo los médicos pueden tener especialidades')
   if (creacion) validarPassword(body.passwordTemporal)
-  return { nombre, correo, telefono, rol: body.rol, especialidades, password: body.passwordTemporal }
+  return { nombre, correo, telefono, rol: body.rol, especialidades, password: body.passwordTemporal, activo: body.activo ?? (creacion ? true : undefined) }
 }
 
 const leerCatalogo = async req => comprobarBD(await req.supabase
@@ -59,7 +60,10 @@ const especialidadesActuales = async (req, perfil) => {
     .filter(Boolean).map(({ id_especialidad, nombre }) => ({ id_especialidad, nombre }))
 }
 
-const representarUsuario = (perfil, correo, especialidades) => ({
+const ultimoAcceso = (req, cuenta) => req.clinicAccess.permisos.includes('usuarios.ver') && typeof cuenta?.last_sign_in_at === 'string'
+  ? cuenta.last_sign_in_at : null
+
+const representarUsuario = (perfil, correo, especialidades, ultimo_acceso = null) => ({
   id: perfil.id,
   nombre: perfil.nombre,
   correo: typeof correo === 'string' ? correo : null,
@@ -67,6 +71,8 @@ const representarUsuario = (perfil, correo, especialidades) => ({
   rol: perfil.rol,
   activo: perfil.activo === true,
   especialidades,
+  creado_en: typeof perfil.creado_en === 'string' ? perfil.creado_en : null,
+  ultimo_acceso,
 })
 
 const autorizarTarget = async (req, id, permiso) => {
@@ -90,13 +96,14 @@ const errorAuth = error => {
 
 const obtenerUsuarios = async (req, res) => {
   try {
+    if (!req.clinicAccess.permisos.includes('usuarios.ver')) fallar(403, 'No tienes permiso para consultar usuarios')
     const perfiles = comprobarBD(await req.supabase.from('perfilusuario').select(camposPerfil)
       .eq('id_veterinaria', req.clinicAccess.id_veterinaria).order('nombre')) || []
     const usuarios = []
     for (const fila of perfiles) {
       try {
         const { perfil, cuenta } = await autorizarTarget(req, fila.id, 'usuarios.ver')
-        usuarios.push(representarUsuario(perfil, cuenta.email, await especialidadesActuales(req, perfil)))
+        usuarios.push(representarUsuario(perfil, cuenta.email, await especialidadesActuales(req, perfil), ultimoAcceso(req, cuenta)))
       } catch (error) {
         // SQL and the live Auth check hide any global or removed account.
         if (!(error instanceof ErrorUsuarios) || error.status !== 404) throw error
@@ -111,6 +118,7 @@ const crearUsuario = async (req, res) => {
   let perfilCreado = false
   try {
     const usuario = validarUsuario(req.body, true, req.clinicAccess)
+    if (!usuario.activo) exigirCambioEstado(req, null, false)
     const overrides = await validarOverrides(req, req.body.permisos === undefined ? {} : req.body.permisos, usuario.rol)
     const especialidades = await especialidadesSolicitadas(req, usuario.especialidades)
     // Auth accepts a server-generated ID. Keep it before sending the request so
@@ -122,17 +130,23 @@ const crearUsuario = async (req, res) => {
       email: usuario.correo,
       password: usuario.password,
       email_confirm: true,
+      // Block Auth before a new inactive account can obtain its first session.
+      ...(!usuario.activo ? { ban_duration: duracionBloqueo } : {}),
       app_metadata: {
         vettrack_tenant_id: req.clinicAccess.id_veterinaria,
         vettrack_created_by: req.clinicAccess.id,
       },
     })
     if (error || data?.user?.id !== nuevaCuentaId) errorAuth(error)
-    const perfil = filaRPC(await req.supabase.rpc('vettrack_crear_usuario', {
+    let perfil = filaRPC(await req.supabase.rpc('vettrack_crear_usuario', {
       p_id: nuevaCuentaId, p_nombre: usuario.nombre, p_telefono: usuario.telefono,
       p_rol: usuario.rol, p_especialidades: usuario.especialidades, p_overrides: overrides,
     }))
     if (!perfil) fallar(502, 'No se pudo crear el perfil del usuario')
+    if (!usuario.activo) {
+      const estado = await actualizarEstadoUsuario(req, nuevaCuentaId, false)
+      perfil = estado.perfil
+    }
     perfilCreado = true
     return res.status(201).json({ message: 'Usuario creado correctamente', usuario: representarUsuario(perfil, data.user.email || usuario.correo, especialidades) })
   } catch (error) {
@@ -156,7 +170,12 @@ const editarUsuario = async (req, res) => {
   try {
     validarId(req.params.id)
     const usuario = validarUsuario(req.body, false, req.clinicAccess)
-    const { cuenta } = await autorizarTarget(req, req.params.id, 'usuarios.editar')
+    const { perfil: anterior, cuenta } = await autorizarTarget(req, req.params.id, 'usuarios.editar')
+    const cambiaEstado = usuario.activo !== undefined && usuario.activo !== anterior.activo
+    if (cambiaEstado) {
+      exigirCambioEstado(req, anterior.id, usuario.activo)
+      await autorizarTarget(req, anterior.id, 'usuarios.desactivar')
+    }
     const especialidades = await especialidadesSolicitadas(req, usuario.especialidades)
     correoAnterior = cuenta.email
     if (!correoAnterior) fallar(409, 'La cuenta no tiene un correo administrable')
@@ -165,13 +184,21 @@ const editarUsuario = async (req, res) => {
       if (resultado.error) errorAuth(resultado.error)
       correoModificado = true
     }
-    const perfil = filaRPC(await req.supabase.rpc('vettrack_editar_usuario', {
+    let perfil = filaRPC(await req.supabase.rpc('vettrack_editar_usuario', {
       p_id: req.params.id, p_nombre: usuario.nombre, p_telefono: usuario.telefono,
       p_rol: usuario.rol, p_especialidades: usuario.especialidades,
     }))
     if (!perfil) fallar(502, 'No se pudo actualizar el perfil del usuario')
     perfilModificado = true
-    return res.json({ message: 'Usuario actualizado correctamente', usuario: representarUsuario(perfil, usuario.correo, especialidades) })
+    if (cambiaEstado) {
+      try {
+        const estado = await actualizarEstadoUsuario(req, perfil.id, usuario.activo)
+        perfil = estado.perfil
+      } catch {
+        fallar(502, 'Los datos del usuario se guardaron, pero no se pudo completar el cambio de estado. Recarga la lista para revisar su estado actual.', { syncPending: true })
+      }
+    }
+    return res.json({ message: 'Usuario actualizado correctamente', usuario: representarUsuario(perfil, usuario.correo, especialidades, ultimoAcceso(req, cuenta)) })
   } catch (error) {
     if (correoModificado && !perfilModificado) {
       try {
@@ -197,15 +224,21 @@ const cambiarPassword = async (req, res) => {
   } catch (error) { return responderError(res, error) }
 }
 
-const cambiarEstado = async (req, res) => {
+const exigirCambioEstado = (req, id, activo) => {
+  if (!req.clinicAccess.permisos.includes('usuarios.desactivar')) fallar(403, 'No tienes permiso para cambiar el estado de usuarios')
+  if (!activo && id?.toLowerCase() === req.clinicAccess.id.toLowerCase()) fallar(409, 'No puedes desactivar tu propia cuenta')
+}
+
+// Shared by create, edit and the contextual state action. SQL retains the
+// existing tenant, capability and last-administrator checks.
+const actualizarEstadoUsuario = async (req, id, activo) => {
   let reactivacionAuth = false
   let estadoSQLModificado = false
   let targetAnterior
   let capabilityTargetId = null
   try {
-    validarCampos(req.body, ['activo'])
-    if (typeof req.body.activo !== 'boolean') fallar(400, 'El estado activo debe ser booleano')
-    const { perfil, cuenta } = await autorizarTarget(req, req.params.id, 'usuarios.desactivar')
+    exigirCambioEstado(req, id, activo)
+    const { perfil, cuenta } = await autorizarTarget(req, id, 'usuarios.desactivar')
     targetAnterior = perfil
     const especialidades = await especialidadesActuales(req, perfil)
     // A short-lived capability proves that this transition passed through the
@@ -217,7 +250,7 @@ const cambiarEstado = async (req, res) => {
       app_metadata: {
         vettrack_state_change: {
           actor_id: req.clinicAccess.id,
-          activo: req.body.activo,
+          activo,
           nonce: tokenEstado,
           expires_at: new Date(Date.now() + 60000).toISOString(),
         },
@@ -226,24 +259,24 @@ const cambiarEstado = async (req, res) => {
     if (emision.error) errorAuth(emision.error)
     // Reactivation unbans while SQL is still inactive. The inverse order would
     // grant database access before Auth has been successfully synchronized.
-    if (req.body.activo) {
+    if (activo) {
       const { error } = await supabaseAdmin.auth.admin.updateUserById(perfil.id, { ban_duration: 'none' })
       if (error) errorAuth(error)
       reactivacionAuth = true
     }
     const actualizado = filaRPC(await req.supabase.rpc('vettrack_estado_usuario', {
-      p_id: perfil.id, p_activo: req.body.activo, p_token: tokenEstado,
+      p_id: perfil.id, p_activo: activo, p_token: tokenEstado,
     }))
     if (!actualizado) fallar(502, 'No se pudo actualizar el estado del usuario')
     estadoSQLModificado = true
-    if (!req.body.activo) {
+    if (!activo) {
       const { error } = await supabaseAdmin.auth.admin.updateUserById(perfil.id, { ban_duration: duracionBloqueo })
       if (error) {
         // The SQL profile remains inactive, denying access even with an old JWT.
-        return res.status(502).json({ error: 'El usuario quedó inactivo; falta sincronizar el bloqueo de acceso', syncPending: true })
+        fallar(502, 'El usuario quedó inactivo; falta sincronizar el bloqueo de acceso', { syncPending: true })
       }
     }
-    return res.json({ message: req.body.activo ? 'Usuario reactivado correctamente' : 'Usuario desactivado correctamente', usuario: representarUsuario(actualizado, cuenta.email, especialidades) })
+    return { perfil: actualizado, cuenta, especialidades }
   } catch (error) {
     if (reactivacionAuth && !estadoSQLModificado && targetAnterior?.activo === false) {
       try {
@@ -251,13 +284,13 @@ const cambiarEstado = async (req, res) => {
         if (restauracion.error) throw new Error('restore_ban')
       } catch {
         console.error('La reactivación falló; el perfil sigue inactivo pero el bloqueo Auth requiere revisión')
-        return res.status(502).json({ error: 'El perfil continúa inactivo; la sincronización de acceso requiere revisión', syncPending: true })
+        fallar(502, 'El perfil continúa inactivo; la sincronización de acceso requiere revisión', { syncPending: true })
       }
     }
-    if (estadoSQLModificado && req.body.activo === false) {
-      return res.status(502).json({ error: 'El usuario quedó inactivo; falta sincronizar el bloqueo de acceso', syncPending: true })
+    if (estadoSQLModificado && activo === false) {
+      fallar(502, 'El usuario quedó inactivo; falta sincronizar el bloqueo de acceso', { syncPending: true })
     }
-    return responderError(res, error)
+    throw error
   } finally {
     if (capabilityTargetId) {
       try {
@@ -273,6 +306,15 @@ const cambiarEstado = async (req, res) => {
       }
     }
   }
+}
+
+const cambiarEstado = async (req, res) => {
+  try {
+    validarCampos(req.body, ['activo'])
+    if (typeof req.body.activo !== 'boolean') fallar(400, 'El estado activo debe ser booleano')
+    const { perfil, cuenta, especialidades } = await actualizarEstadoUsuario(req, req.params.id, req.body.activo)
+    return res.json({ message: perfil.activo ? 'Usuario reactivado correctamente' : 'Usuario desactivado correctamente', usuario: representarUsuario(perfil, cuenta.email, especialidades, ultimoAcceso(req, cuenta)) })
+  } catch (error) { return responderError(res, error) }
 }
 
 const representarPermisos = (catalogo, permisos) => {

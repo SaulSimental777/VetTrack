@@ -132,10 +132,28 @@ test('create derives trusted metadata from clinic access, preserves Unicode pass
   const res = response()
   await handlers.crearUsuario(request(body({ passwordTemporal })), res)
   assert.equal(res.statusCode, 201)
-  assert.deepEqual(res.body.usuario, { id: target, nombre: 'Persona', correo: 'persona@example.com', telefono: null, rol: 'recepcionista', activo: true, especialidades: [], creado_en: null, ultimo_acceso: null })
+  assert.deepEqual(res.body.usuario, { id: target, nombre: 'Persona', correo: 'persona@example.com', telefono: null, rol: 'recepcionista', activo: true, especialidades: [], creado_en: null, ultimo_acceso: null, cedula_profesional: null })
   assert.ok(!JSON.stringify(res.body).includes(passwordTemporal))
   assert.ok(!JSON.stringify(res.body).includes('app_metadata'))
   assert.equal(state.planned.length, 0)
+})
+
+test('admin can register a doctor license without exposing Auth data', async () => {
+ plan('auth','createUser',{data:{user:authUser()},error:null})
+ plan('rpc','vettrack_crear_usuario',{data:profile({rol:'medico'}),error:null})
+ plan('rpc','vettrack_usuario_cedula',{data:{id:target,cedula_profesional:'12345678'},error:null},args=>assert.deepEqual(args,{p_id:target,p_cedula:'12345678'}))
+ const res=response();await handlers.crearUsuario(request(body({rol:'medico',passwordTemporal:'Vettrack123',cedula_profesional:'12345678'})),res)
+ assert.equal(res.statusCode,201);assert.equal(res.body.usuario.cedula_profesional,'12345678');noSecrets(res.body)
+})
+test('doctor license rejects invalid values and delegated actors before Auth mutation', async () => {
+ for(const value of ['ABC','1234','1'.repeat(21)]){
+  const res=response();await handlers.crearUsuario(request(body({rol:'medico',passwordTemporal:'Vettrack123',cedula_profesional:value})),res);assert.equal(res.statusCode,400)
+ }
+ const res=response();const req=request(body({rol:'medico',cedula_profesional:'12345678'}));req.clinicAccess.rol='recepcionista';await handlers.editarUsuario(req,res);assert.equal(res.statusCode,403);assert.deepEqual(state.calls,[])
+})
+test('license failure after profile edit reports partial synchronization safely', async () => {
+ guard('usuarios.editar',profile({rol:'medico'}));plan('rpc','vettrack_editar_usuario',{data:profile({rol:'medico'}),error:null});plan('rpc','vettrack_usuario_cedula',{data:null,error:{code:'42501',message:'private upstream'}})
+ const res=response();await handlers.editarUsuario(request(body({rol:'medico',cedula_profesional:'12345678'})),res);assert.equal(res.statusCode,502);assert.equal(res.body.syncPending,true);noSecrets(res.body)
 })
 
 test('delegated creators cannot create admins or grant overrides before an Auth account is made', async () => {
@@ -710,7 +728,7 @@ test('last access is an allowlisted Auth field returned only after view and tena
   assert.equal(res.statusCode, 200)
   assert.equal(res.body[0].creado_en, created)
   assert.equal(res.body[0].ultimo_acceso, signedIn)
-  assert.deepEqual(Object.keys(res.body[0]).sort(), ['id', 'nombre', 'correo', 'telefono', 'rol', 'activo', 'especialidades', 'creado_en', 'ultimo_acceso'].sort())
+  assert.deepEqual(Object.keys(res.body[0]).sort(), ['id', 'nombre', 'correo', 'telefono', 'rol', 'activo', 'especialidades', 'creado_en', 'ultimo_acceso', 'cedula_profesional'].sort())
   noSecrets(res.body)
   assert.doesNotMatch(JSON.stringify(res.body), /identities|providers|app_metadata/)
 })

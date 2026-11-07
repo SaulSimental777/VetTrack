@@ -45,7 +45,11 @@ export async function apiFetch<T>(
       ...options,
       headers,
     }
-  )
+  ).catch(cause => {
+    if (options.signal?.aborted) throw cause
+    console.error('API no disponible', cause)
+    throw new ApiError('No se pudo conectar con VetTrack. Revisa tu conexión y vuelve a intentar.', 503)
+  })
 
   const data = await response
     .json()
@@ -57,7 +61,7 @@ export async function apiFetch<T>(
     }
     throw new ApiError(
       data?.error ||
-      `Error HTTP ${response.status}`,
+      'No se pudo completar la operación. Vuelve a intentarlo.',
       response.status,
       data
     )

@@ -5,12 +5,12 @@ const {
   texto, validarPassword, correoValido, comprobarBD, filaRPC, responderError,
 } = require('./usuarios.shared')
 
-const camposPerfil = 'id, nombre, telefono, rol, activo, id_veterinaria, creado_en'
+const camposPerfil = 'id, nombre, telefono, rol, activo, id_veterinaria, creado_en, cedula_profesional'
 const roles = ['admin', 'recepcionista', 'medico']
 const duracionBloqueo = '876000h'
 
 const validarUsuario = (body, creacion, acceso) => {
-  validarCampos(body, ['nombre', 'correo', 'telefono', 'rol', 'activo', 'especialidades', ...(creacion ? ['passwordTemporal', 'permisos'] : [])])
+  validarCampos(body, ['nombre', 'correo', 'telefono', 'rol', 'activo', 'especialidades', 'cedula_profesional', ...(creacion ? ['passwordTemporal', 'permisos'] : [])])
   const nombre = texto(body.nombre, 'El nombre', 100)
   const correo = texto(body.correo, 'El correo', 100).toLowerCase()
   if (!correoValido(correo)) fallar(400, 'Ingresa un correo válido, por ejemplo nombre@veterinaria.com.')
@@ -25,7 +25,11 @@ const validarUsuario = (body, creacion, acceso) => {
   if (new Set(especialidades.map(id => id.toLowerCase())).size !== especialidades.length) fallar(400, 'No se permiten especialidades repetidas')
   if (body.rol !== 'medico' && especialidades.length) fallar(400, 'Solo los médicos pueden tener especialidades')
   if (creacion) validarPassword(body.passwordTemporal)
-  return { nombre, correo, telefono, rol: body.rol, especialidades, password: body.passwordTemporal, activo: body.activo ?? (creacion ? true : undefined) }
+  if (body.cedula_profesional !== undefined) {
+    if (acceso.rol !== 'admin') fallar(403, 'Solo el administrador puede registrar la cédula de otro médico')
+    if (body.rol !== 'medico' || (body.cedula_profesional !== null && (typeof body.cedula_profesional !== 'string' || !/^[0-9]{5,20}$/.test(body.cedula_profesional)))) fallar(400, 'La cédula del médico debe contener de 5 a 20 dígitos')
+  }
+  return { nombre, correo, telefono, rol: body.rol, especialidades, cedula: body.cedula_profesional, password: body.passwordTemporal, activo: body.activo ?? (creacion ? true : undefined) }
 }
 
 const leerCatalogo = async req => comprobarBD(await req.supabase
@@ -73,6 +77,7 @@ const representarUsuario = (perfil, correo, especialidades, ultimo_acceso = null
   especialidades,
   creado_en: typeof perfil.creado_en === 'string' ? perfil.creado_en : null,
   ultimo_acceso,
+  cedula_profesional: perfil.cedula_profesional ?? null,
 })
 
 const autorizarTarget = async (req, id, permiso) => {
@@ -147,6 +152,10 @@ const crearUsuario = async (req, res) => {
       const estado = await actualizarEstadoUsuario(req, nuevaCuentaId, false)
       perfil = estado.perfil
     }
+    if (usuario.cedula !== undefined) {
+      comprobarBD(await req.supabase.rpc('vettrack_usuario_cedula', { p_id: nuevaCuentaId, p_cedula: usuario.cedula }))
+      perfil.cedula_profesional = usuario.cedula
+    }
     perfilCreado = true
     return res.status(201).json({ message: 'Usuario creado correctamente', usuario: representarUsuario(perfil, data.user.email || usuario.correo, especialidades) })
   } catch (error) {
@@ -190,6 +199,12 @@ const editarUsuario = async (req, res) => {
     }))
     if (!perfil) fallar(502, 'No se pudo actualizar el perfil del usuario')
     perfilModificado = true
+    if (usuario.cedula !== undefined) {
+      try {
+        comprobarBD(await req.supabase.rpc('vettrack_usuario_cedula', { p_id: perfil.id, p_cedula: usuario.cedula }))
+        perfil.cedula_profesional = usuario.cedula
+      } catch { fallar(502, 'El perfil se guardó, pero falta confirmar la cédula. Recarga los usuarios antes de continuar.', { syncPending: true }) }
+    }
     if (cambiaEstado) {
       try {
         const estado = await actualizarEstadoUsuario(req, perfil.id, usuario.activo)

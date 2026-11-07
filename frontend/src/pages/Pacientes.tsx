@@ -1,3 +1,4 @@
+import { SearchableSelect } from '../components/SearchableSelect'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import { apiFetch } from '../lib/api'
@@ -23,7 +24,7 @@ const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Tijuan
 const errorMessage = (cause: unknown, fallback: string) => cause instanceof Error ? cause.message : fallback
 
 function Pacientes() {
-  const { can } = usePermissions()
+  const { access, can } = usePermissions()
   const [pacientes, setPacientes] = useState<Paciente[]>([])
   const [propietarios, setPropietarios] = useState<Propietario[]>([])
   const [loading, setLoading] = useState(true)
@@ -147,7 +148,7 @@ function Pacientes() {
             <thead><tr><th scope="col">Nombre</th><th scope="col">Especie</th><th scope="col">Raza</th><th scope="col">Sexo</th><th scope="col">Propietario</th><th scope="col">Acciones</th></tr></thead>
             <tbody>{filtered.map(paciente => <tr key={paciente.id_mascota}>
               <td><strong>{paciente.nombre}</strong></td><td>{paciente.especie || 'Sin registrar'}</td><td>{paciente.raza || '—'}</td><td>{paciente.sexo || 'Sin registrar'}</td><td>{paciente.propietario?.nombre || 'No disponible'}</td>
-              <td><div className="dueno-actions">{can('expediente.ver') && <button type="button" onClick={() => { window.location.hash = `/expediente?paciente=${paciente.id_mascota}` }}>Ver expediente</button>}{can('pacientes.editar') && <button type="button" aria-label={`Editar ${paciente.nombre}`} disabled={!propietarios.length || Boolean(ownersError)} onClick={() => openEditor(paciente)}>Editar</button>}
+              <td><div className="dueno-actions">{can('expediente.ver') && ['admin','medico'].includes(access.rol) && <button type="button" onClick={() => { window.location.hash = `/expediente?paciente=${paciente.id_mascota}` }}>Ver expediente</button>}{can('pacientes.editar') && <button type="button" aria-label={`Editar ${paciente.nombre}`} disabled={!propietarios.length || Boolean(ownersError)} onClick={() => openEditor(paciente)}>Editar</button>}
                 {can('pacientes.eliminar') && <button type="button" className="danger" aria-label={`Eliminar ${paciente.nombre}`} onClick={() => { focusReturn.current = document.activeElement as HTMLElement; setModalError(''); setEliminando(paciente) }}>Eliminar</button>}</div></td>
             </tr>)}</tbody>
           </table></div>}
@@ -160,7 +161,7 @@ function Pacientes() {
             <div className="modal-body">
               <fieldset disabled={pending} className="paciente-fields">
                 <div className="form-group"><label htmlFor="patient-name">Nombre *</label><input id="patient-name" required maxLength={100} value={form.nombre} onChange={event => field('nombre', event.target.value)} /></div>
-                <div className="form-group"><label htmlFor="patient-owner">Propietario *</label><select id="patient-owner" required value={form.id_dueno} onChange={event => field('id_dueno', event.target.value)}><option value="">Selecciona un propietario</option>{propietarios.map(owner => <option key={owner.id_dueno} value={owner.id_dueno}>{owner.nombre}</option>)}</select></div>
+                <div className="form-group"><label htmlFor="patient-owner">Propietario *</label><SearchableSelect id="patient-owner" required value={form.id_dueno} onChange={event => field('id_dueno', event.target.value)}><option value="">Selecciona un propietario</option>{propietarios.map(owner => <option key={owner.id_dueno} value={owner.id_dueno}>{owner.nombre}</option>)}</SearchableSelect></div>
                 <div className="form-row">
                   <div className="form-group"><label htmlFor="patient-species">Especie</label><input id="patient-species" maxLength={100} placeholder="Ej. Perro, gato" value={form.especie} onChange={event => field('especie', event.target.value)} /></div>
                   <div className="form-group"><label htmlFor="patient-breed">Raza</label><input id="patient-breed" maxLength={100} value={form.raza} onChange={event => field('raza', event.target.value)} /></div>

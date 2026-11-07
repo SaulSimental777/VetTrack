@@ -12,7 +12,11 @@ import { apiFetch } from './lib/api'
 import { PermissionsContext } from './lib/permissions'
 import type { ClinicAccess } from './lib/permissions'
 import './App.css'
+import './design-system.css'
+import { ConfirmProvider } from './components/ConfirmProvider'
+import { Icon } from './components/Icon'
 
+const Horarios = lazy(() => import('./pages/Horarios'))
 const Medicos = lazy(() => import('./pages/Medicos'))
 const Servicios = lazy(() => import('./pages/Servicios'))
 const Citas = lazy(() => import('./pages/Citas'))
@@ -20,21 +24,28 @@ const Clinica = lazy(() => import('./pages/Clinica'))
 const Expediente = lazy(() => import('./pages/Expediente'))
 const OrdenesRecepcion = lazy(() => import('./pages/OrdenesRecepcion'))
 const Inventario = lazy(() => import('./pages/Inventario'))
+const Pagos = lazy(() => import('./pages/FinalOperations').then(m => ({ default: m.Pagos })))
+const Reportes = lazy(() => import('./pages/FinalOperations').then(m => ({ default: m.Reportes })))
+const Configuracion = lazy(() => import('./pages/FinalOperations').then(m => ({ default: m.Configuracion })))
 
 const clinicRoutes = [
-  { path: '/dashboard', title: 'Dashboard', permission: 'dashboard.ver', icon: '▦' },
-  { path: '/propietarios', title: 'Propietarios', permission: 'propietarios.ver', icon: '♙' },
-  { path: '/pacientes', title: 'Pacientes', permission: 'pacientes.ver', icon: '♧' },
-  { path: '/citas', title: 'Citas', permission: 'citas.ver', icon: '▣' },
-  { path: '/clinica', title: 'Consultas', permission: 'consultas.ver', icon: '✚' },
-  { path: '/expediente', title: 'Expediente', permission: 'expediente.ver', icon: '▤' },
-  { path: '/ordenes-recepcion', title: 'Órdenes de recepción', permission: 'orden_recepcion.ver', icon: '▧' },
-  { path: '/medicos', title: 'Médicos', permission: 'medicos.ver', icon: '✚' },
-  { path: '/servicios', title: 'Servicios', permission: 'servicios.ver', icon: '◆' },
-  { path: '/inventario', title: 'Inventario', permission: 'inventario.ver', icon: '□' },
-  { path: '/proveedores', title: 'Proveedores', permission: 'proveedores.ver', icon: '◇' },
-  { path: '/compras', title: 'Compras', permission: 'compras.ver', icon: '▤' },
-  { path: '/configuracion/usuarios', title: 'Usuarios', permission: 'usuarios.ver', icon: '⚙' },
+  { path: '/dashboard', title: 'Dashboard', permission: 'dashboard.ver', icon: 'dashboard' },
+  { path: '/propietarios', title: 'Propietarios', permission: 'propietarios.ver', icon: 'people' },
+  { path: '/pacientes', title: 'Pacientes', permission: 'pacientes.ver', icon: 'patient' },
+  { path: '/citas', title: 'Citas', permission: 'citas.ver', icon: 'calendar' },
+  { path: '/clinica', title: 'Consultas', permission: 'consultas.ver', icon: 'clinical' },
+  { path: '/expediente', title: 'Expediente', permission: 'expediente.ver', icon: 'file' },
+  { path: '/ordenes-recepcion', title: 'Órdenes de recepción', permission: 'orden_recepcion.ver', icon: 'file' },
+  { path: '/medicos', title: 'Médicos', permission: 'medicos.ver', icon: 'people' },
+  { path: '/horarios', title: 'Horarios', permission: 'horarios.ver', icon: 'clock' },
+  { path: '/servicios', title: 'Servicios', permission: 'servicios.ver', icon: 'clinical' },
+  { path: '/inventario', title: 'Inventario', permission: 'inventario.ver', icon: 'box' },
+  { path: '/proveedores', title: 'Proveedores', permission: 'proveedores.ver', icon: 'people' },
+  { path: '/compras', title: 'Compras', permission: 'compras.ver', icon: 'box' },
+  { path: '/pagos', title: 'Pagos', permission: 'pagos.ver', icon: 'money' },
+  { path: '/reportes', title: 'Reportes', permission: 'reportes.ver', icon: 'file' },
+  { path: '/configuracion', title: 'Configuración', permission: 'configuracion.ver', icon: 'settings' },
+  { path: '/configuracion/usuarios', title: 'Usuarios', permission: 'usuarios.ver', icon: 'settings' },
 ] as const
 
 const currentClinicPath = () => window.location.hash.startsWith('#/')
@@ -72,8 +83,8 @@ function LogoutButton() {
 
   return (
     <>
-      <button type="button" className="nav-item logout" onClick={logout} disabled={pending}>
-        <span aria-hidden="true">←</span>
+      <button type="button" className="user-logout" aria-label="Cerrar sesión" onClick={logout} disabled={pending}>
+        <Icon name="logout" />
         <span className="nav-label">{pending ? 'Cerrando sesión…' : 'Cerrar sesión'}</span>
       </button>
       {error && <p className="logout-error" role="alert">{error}</p>}
@@ -81,28 +92,29 @@ function LogoutButton() {
   )
 }
 
-function Workspace({ session, clinic, role, title, navigation, children }: {
+function Workspace({ session, clinic, role, userName, title, navigation, children }: {
   session: Session
   clinic?: string
   role?: string
+  userName?: string | null
   title: string
   navigation: ReactNode
   children: ReactNode
 }) {
+  const [sidebar, setSidebar] = useState(false)
   const email = session.user.email || 'Sin correo electrónico'
 
   return (
-    <div className="app">
-      <aside className="sidebar">
+    <div className={`app ${sidebar ? 'sidebar-open' : ''}`}><button type="button" className="sidebar-backdrop" aria-label="Cerrar navegación" onClick={() => setSidebar(false)} />
+      <aside className="sidebar" onClick={event => { if ((event.target as HTMLElement).closest('button')) setSidebar(false) }}>
         <div className="brand">
           <div className="brand-icon" aria-hidden="true">V</div>
           <div><h1>VetTrack</h1><span>Gestión veterinaria</span></div>
         </div>
         <nav className="navigation" aria-label="Navegación principal">{navigation}</nav>
-        <div className="sidebar-bottom"><LogoutButton /></div>
       </aside>
       <main className="main-content">
-        <header className="topbar">
+        <header className="topbar"><button type="button" className="mobile-menu" aria-label="Abrir navegación" aria-expanded={sidebar} onClick={() => setSidebar(value => !value)}><Icon name="menu" /></button>
           <div>
             <span className="breadcrumb">VetTrack / {clinic ? `${clinic} / ` : ''}{title}</span>
             <h2>{title}</h2>
@@ -114,9 +126,10 @@ function Workspace({ session, clinic, role, title, navigation, children }: {
             </div>
             <div className="user-avatar" aria-hidden="true">{email.charAt(0).toUpperCase()}</div>
             <div className="user-info">
-              <strong>{clinic ? (role || 'Usuario de clínica') : 'Superadministrador'}</strong>
-              <span>{email}</span>
+              <strong>{userName || (clinic ? (role || 'Usuario de clínica') : 'Superadministrador')}</strong>
+              <span title={email}>{role || 'Superadministrador'} · {clinic || 'Administración global'}</span>
             </div>
+            <LogoutButton />
           </div>
         </header>
         <section className="content">{children}</section>
@@ -173,24 +186,22 @@ function ClinicWorkspace({ session }: { session: Session }) {
   if (error) return <SessionScreen message={error}><button type="button" className="primary-button" onClick={() => { void refresh().catch(() => {}) }}>Reintentar</button><div className="session-actions"><LogoutButton /></div></SessionScreen>
   if (!access) return <SessionScreen message="Verificando tu clínica y permisos…" />
   const route = clinicRoutes.find(item => item.path === path)
-  const allowed = route && can(route.permission)
+  const visible = (item: typeof clinicRoutes[number]) => can(item.permission) && (!['/clinica','/expediente'].includes(item.path) || ['admin','medico'].includes(access.rol))
+  const allowed = route && visible(route)
   const pageKey = `${access.id}:${access.id_veterinaria}:${access.rol}:${[...access.permisos].sort().join(',')}`
   const roleLabel = { admin: 'Administrador', recepcionista: 'Recepcionista', medico: 'Médico' }[access.rol]
 
   return (
     <PermissionsContext.Provider value={{ access, refresh, can }}>
-    <Workspace session={session} clinic={access.nombre_veterinaria} role={roleLabel} title={route?.title || 'Acceso no autorizado'} navigation={
+    <Workspace session={session} clinic={access.nombre_veterinaria} role={roleLabel} userName={access.nombre} title={route?.title || 'Acceso no autorizado'} navigation={
       <>
-        {clinicRoutes.filter(item => can(item.permission)).map(item => <div key={item.path}>
+        {clinicRoutes.filter(visible).map(item => <div key={item.path}>
           {item.path === '/configuracion/usuarios' && <div className="nav-section">Configuración</div>}
           {item.path === '/medicos' && <div className="nav-section">Administración</div>}
           <button type="button" className={`nav-item ${path === item.path ? 'active' : ''}`} aria-current={path === item.path ? 'page' : undefined} onClick={() => { window.location.hash = item.path }}>
-            <span aria-hidden="true">{item.icon}</span><span className="nav-label">{item.title}</span>
+            <Icon name={item.icon} /><span className="nav-label">{item.title}</span>
           </button>
         </div>)}
-        {[
-          ['pagos.ver', 'Pagos', '$'],
-        ].filter(([permission]) => can(permission)).map(([permission, label, icon]) => <button key={permission} type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">{icon}</span><span className="nav-label">{label}</span></button>)}
       </>
     }>
       <div key={pageKey}>
@@ -200,6 +211,7 @@ function ClinicWorkspace({ session }: { session: Session }) {
           : path === '/pacientes' ? <Pacientes />
           : path === '/configuracion/usuarios' ? <Usuarios />
           : path === '/medicos' ? <Medicos />
+          : path === '/horarios' ? <Horarios />
           : path === '/servicios' ? <Servicios />
           : path === '/citas' ? <Citas />
           : path === '/clinica' ? <Clinica />
@@ -208,6 +220,9 @@ function ClinicWorkspace({ session }: { session: Session }) {
           : path === '/inventario' ? <Inventario />
           : path === '/proveedores' ? <Inventario module="proveedores" />
           : path === '/compras' ? <Inventario module="compras" />
+          : path === '/pagos' ? <Pagos />
+          : path === '/reportes' ? <Reportes />
+          : path === '/configuracion' ? <Configuracion />
           : <Dashboard clinicId={access.id_veterinaria} clinicName={access.nombre_veterinaria} />}
         </Suspense>
       </div>
@@ -267,4 +282,4 @@ function App() {
   return <ClinicWorkspace key={`${session.user.id}:clinic`} session={session} />
 }
 
-export default App
+export default function VetTrack() { return <ConfirmProvider><App /></ConfirmProvider> }

@@ -1,3 +1,4 @@
+import { StatusBadge } from '../components/StatusBadge'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { ApiError, apiFetch } from '../lib/api'
@@ -16,6 +17,7 @@ interface Usuario {
   especialidades: Especialidad[]
   creado_en: string | null
   ultimo_acceso: string | null
+  cedula_profesional?: string | null
 }
 interface UsuarioResponse { message: string; usuario: Usuario }
 interface Permiso { clave: string; modulo: string; accion: string; descripcion: string }
@@ -178,6 +180,7 @@ function UsuarioEditor({ usuario, selfId, isAdmin, lastAdmin, canCreateSpecialty
   onUnconfirmed: () => void
 }) {
   const [form, setForm] = useState({ nombre: usuario?.nombre || '', correo: usuario?.correo || '', telefono: usuario?.telefono || '', rol: usuario?.rol || 'recepcionista' as Role, activo: usuario?.activo ?? true })
+  const [license, setLicense] = useState(usuario?.cedula_profesional || '')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [selected, setSelected] = useState<string[]>(usuario?.especialidades.map(item => item.id_especialidad) || [])
@@ -250,7 +253,7 @@ function UsuarioEditor({ usuario, selfId, isAdmin, lastAdmin, canCreateSpecialty
       const result = await apiFetch<UsuarioResponse>(usuario ? `/api/usuarios/${usuario.id}` : '/api/usuarios', {
         method: usuario ? 'PUT' : 'POST', signal: controller.signal,
         body: JSON.stringify({ nombre: form.nombre.trim(), correo: form.correo.trim(), telefono: form.telefono.trim() || null,
-          rol: form.rol, activo: form.activo, especialidades: form.rol === 'medico' ? selected : [], ...(!usuario ? { passwordTemporal: password } : {}) }),
+          ...(isAdmin && form.rol === 'medico' ? { cedula_profesional: license || null } : {}), rol: form.rol, activo: form.activo, especialidades: form.rol === 'medico' ? selected : [], ...(!usuario ? { passwordTemporal: password } : {}) }),
       })
       if (controller.signal.aborted) return
       setPassword('')
@@ -272,7 +275,7 @@ function UsuarioEditor({ usuario, selfId, isAdmin, lastAdmin, canCreateSpecialty
   }
 
   return (
-    <UserDialog title={usuario ? 'Editar usuario' : 'Nuevo usuario'} pending={pending} onClose={close} wide headerStatus={usuario && <>Estado actual: <span className={`users-state ${usuario.activo ? 'active' : 'inactive'}`}><span aria-hidden="true" />{usuario.activo ? 'ACTIVO' : 'INACTIVO'}</span></>}>
+    <UserDialog title={usuario ? 'Editar usuario' : 'Nuevo usuario'} pending={pending} onClose={close} wide headerStatus={usuario && <>Estado actual: <StatusBadge value={usuario.activo ? 'activo' : 'inactivo'} /></>}>
       <form onSubmit={save}>
         <div className="users-dialog-body">
           <fieldset disabled={pending} className="users-fields">
@@ -289,6 +292,7 @@ function UsuarioEditor({ usuario, selfId, isAdmin, lastAdmin, canCreateSpecialty
               </div>
               <div className="users-field"><label htmlFor="user-state">Estado</label><select id="user-state" value={form.activo ? 'active' : 'inactive'} onChange={event => setForm(previous => ({ ...previous, activo: event.target.value === 'active' }))} disabled={lockedState}><option value="active">Activo</option><option value="inactive">Inactivo</option></select>{lockedState && <small>{!canChangeState ? 'No tienes permiso para cambiar el estado de la cuenta.' : usuario?.id === selfId ? 'No puedes cambiar el estado de tu propia cuenta.' : 'Debe conservarse al menos un administrador activo.'}</small>}</div>
             </div>
+            {form.rol === 'medico' && isAdmin && <div className="users-field"><label htmlFor="user-license">Cédula profesional</label><input id="user-license" inputMode="numeric" pattern="[0-9]{5,20}" maxLength={20} value={license} onChange={event => setLicense(event.target.value)} /></div>}
             {!usuario && <PasswordFields password={password} confirmation={confirmation} onPassword={value => { setPassword(value); setError('') }} onConfirmation={value => { setConfirmation(value); setError('') }} prefix="new-user" />}
             {form.rol === 'medico' && (
               <section className="users-specialties" aria-labelledby="user-specialties-title">

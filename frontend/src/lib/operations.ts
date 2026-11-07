@@ -5,7 +5,7 @@ export { formatDuration } from './duration'
 export interface Especialidad { id_especialidad: string; nombre: string; descripcion: string | null }
 export interface Horario { id_horario?: string; dia_semana: number; hora_inicio: string; hora_fin: string; activo: boolean }
 export interface Bloqueo { id_bloqueo: string; fecha_inicio: string; fecha_fin: string; motivo: string | null; tipo: string }
-export interface Medico { id: string; nombre: string | null; activo: boolean; especialidades: Especialidad[]; horario_hoy: Horario[]; proxima_cita: { id_cita: string; fecha_inicio: string; fecha_fin: string } | null }
+export interface Medico { cedula_profesional?: string | null; id: string; nombre: string | null; activo: boolean; especialidades: Especialidad[]; horario_hoy: Horario[]; proxima_cita: { id_cita: string; fecha_inicio: string; fecha_fin: string } | null }
 export interface Servicio { id_servicio: string; nombre: string; descripcion: string | null; costo: number | string; duracion_minutos: number; activo: boolean; especialidades: Especialidad[] }
 export interface CitaServicio { id_servicio: string; nombre: string; precio_aplicado: number | string; duracion_aplicada: number; estado: string }
 export interface Cita { id_cita: string; fecha_inicio: string; fecha_fin: string; estado: string; motivo: string | null; id_mascota: string; id_dueno: string; id_medico: string; paciente: string | null; propietario: string | null; medico: string | null; servicios: CitaServicio[]; subtotal: number | string }

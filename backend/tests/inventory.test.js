@@ -89,3 +89,32 @@ test('cross tenant failures return safe errors and stock mutation cannot use GET
   assert.equal((await request('/compra_recibir?id='+id(12))).status,405)
   assert.equal((await request('/not_real')).status,404)
 })
+
+test('lot and recent receipt filters validate expiry windows and reuse existing permissions', async () => {
+  for (const route of ['/lotes?dias=7','/lotes?estado=unknown','/recepciones?dias=8','/lotes?id_veterinaria='+id(2)]) assert.equal((await request(route)).status,400)
+  plan('vettrack_inventario',[],args=>assert.deepEqual(args,{p_operacion:'lotes',p_datos:{id_producto:id(10),dias:60,estado:'proximos'}}))
+  assert.equal((await request('/lotes?id_producto='+id(10)+'&dias=60&estado=proximos')).status,200)
+  state.permissions=['inventario.ver']
+  assert.equal((await request('/recepciones?dias=7')).status,403)
+  plan('vettrack_inventario',[])
+  assert.equal((await request('/lotes')).status,200)
+})
+test('purchase receipt accepts split lots and supplier document without modifying requested quantities', async () => {
+  const data={id:id(17),fecha_documento:'2026-11-06',folio_documento:'REM-1',documento_url:'https://example.com/remision.pdf',observaciones:'Dos lotes',recepciones:[{id_compra_detalle:id(18),cantidad:3,precio_unitario:20,numero_lote:'A',fecha_caducidad:'2027-01-20'},{id_compra_detalle:id(18),cantidad:2,precio_unitario:21,numero_lote:'B',fecha_caducidad:'2027-06-15'}]}
+  plan('vettrack_inventario',{estado:'recibida'},args=>assert.deepEqual(args.p_datos,data))
+  assert.equal((await request('/compra_recibir','POST',data)).status,200)
+  for (const change of [{fecha_documento:'2026-02-30'},{documento_url:'http://example.com/a'},{documento_url:'https://user:secret@example.com/a'},{recepciones:[]},{recepciones:[{...data.recepciones[0],cantidad:0}]},{recepciones:[{...data.recepciones[0],numero_lote:null}]},{recepciones:[{...data.recepciones[0],id_veterinaria:id(2)}]}]) assert.equal((await request('/compra_recibir','POST',{...data,...change})).status,400)
+})
+test('manual lot entry validates date and lot number; exits rely on server FEFO', async () => {
+  const data={id_producto:id(10),tipo:'entrada',cantidad:2,idempotencia:id(20),motivo:'Entrada de lote',numero_lote:'ABC',fecha_caducidad:'2027-01-20'}
+  plan('vettrack_inventario',{},args=>assert.deepEqual(args.p_datos,data))
+  assert.equal((await request('/mover','POST',data)).status,200)
+  for(const change of [{tipo:'salida'},{numero_lote:'a'.repeat(101)},{fecha_caducidad:'2027-02-30'},{numero_lote:null}])assert.equal((await request('/mover','POST',{...data,...change})).status,400)
+  plan('vettrack_inventario',null,undefined,{code:'23514',message:'Existencias vigentes insuficientes; hay lotes caducados o inactivos'})
+  const r=await request('/mover','POST',{id_producto:id(10),tipo:'salida',cantidad:2,idempotencia:id(21),motivo:'Entrega'});assert.equal(r.status,409);assert.match(r.body.error,/lotes caducados/)
+})
+test('new purchase preserves supplier document metadata using the JWT RPC', async () => {
+  const data={id_proveedor:id(15),detalles:[{id_producto:id(10),cantidad:2,precio_unitario:20}],fecha_solicitud:'2026-11-06',fecha_documento:null,folio_documento:'SOL-1',documento_url:null,observaciones:'Solicitud'}
+  plan('vettrack_inventario',{id:id(17)},args=>assert.deepEqual(args.p_datos,data))
+  assert.equal((await request('/compra_crear','POST',data)).status,200)
+})

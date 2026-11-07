@@ -356,6 +356,9 @@ BEGIN
     IF to_regprocedure('public.vettrack_inventario(text,jsonb)') IS NOT NULL THEN
         operational_tables := operational_tables || ARRAY['proveedor','compra','compra_detalle','venta_preparada','venta_preparada_detalle','movimiento_inventario'];
     END IF;
+    IF to_regclass('public.lote_inventario') IS NOT NULL THEN
+        operational_tables := operational_tables || ARRAY['lote_inventario','recepcion_compra_detalle','movimiento_lote'];
+    END IF;
     FOREACH table_name IN ARRAY ARRAY[
         'dueno', 'mascota', 'cita', 'diagnostico', 'historialmedico', 'receta',
         'producto', 'servicio', 'pago', 'experto', 'promocion', 'ubicacion',

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
@@ -13,10 +13,17 @@ import { PermissionsContext } from './lib/permissions'
 import type { ClinicAccess } from './lib/permissions'
 import './App.css'
 
+const Medicos = lazy(() => import('./pages/Medicos'))
+const Servicios = lazy(() => import('./pages/Servicios'))
+const Citas = lazy(() => import('./pages/Citas'))
+
 const clinicRoutes = [
   { path: '/dashboard', title: 'Dashboard', permission: 'dashboard.ver', icon: '▦' },
   { path: '/propietarios', title: 'Propietarios', permission: 'propietarios.ver', icon: '♙' },
   { path: '/pacientes', title: 'Pacientes', permission: 'pacientes.ver', icon: '♧' },
+  { path: '/citas', title: 'Citas', permission: 'citas.ver', icon: '▣' },
+  { path: '/medicos', title: 'Médicos', permission: 'medicos.ver', icon: '✚' },
+  { path: '/servicios', title: 'Servicios', permission: 'servicios.ver', icon: '◆' },
   { path: '/configuracion/usuarios', title: 'Usuarios', permission: 'usuarios.ver', icon: '⚙' },
 ] as const
 
@@ -166,22 +173,28 @@ function ClinicWorkspace({ session }: { session: Session }) {
       <>
         {clinicRoutes.filter(item => can(item.permission)).map(item => <div key={item.path}>
           {item.path === '/configuracion/usuarios' && <div className="nav-section">Configuración</div>}
+          {item.path === '/medicos' && <div className="nav-section">Administración</div>}
           <button type="button" className={`nav-item ${path === item.path ? 'active' : ''}`} aria-current={path === item.path ? 'page' : undefined} onClick={() => { window.location.hash = item.path }}>
             <span aria-hidden="true">{item.icon}</span><span className="nav-label">{item.title}</span>
           </button>
         </div>)}
         {[
-          ['citas.ver', 'Citas', '▣'], ['diagnosticos.ver', 'Diagnósticos', '✚'],
-          ['servicios.ver', 'Servicios', '◆'], ['inventario.ver', 'Inventario', '□'], ['pagos.ver', 'Pagos', '$'],
+          ['diagnosticos.ver', 'Diagnósticos', '✚'],
+          ['inventario.ver', 'Inventario', '□'], ['pagos.ver', 'Pagos', '$'],
         ].filter(([permission]) => can(permission)).map(([permission, label, icon]) => <button key={permission} type="button" className="nav-item" disabled title="Próximamente"><span aria-hidden="true">{icon}</span><span className="nav-label">{label}</span></button>)}
       </>
     }>
       <div key={pageKey}>
+        <Suspense fallback={<p role="status">Cargando módulo…</p>}>
         {!allowed ? <div className="panel access-denied" role="alert"><h3>403 · Acceso no autorizado</h3><p>No tienes permiso para abrir esta pantalla.</p></div>
           : path === '/propietarios' ? <Duenos />
           : path === '/pacientes' ? <Pacientes />
           : path === '/configuracion/usuarios' ? <Usuarios />
+          : path === '/medicos' ? <Medicos />
+          : path === '/servicios' ? <Servicios />
+          : path === '/citas' ? <Citas />
           : <Dashboard clinicId={access.id_veterinaria} clinicName={access.nombre_veterinaria} />}
+        </Suspense>
       </div>
     </Workspace>
     </PermissionsContext.Provider>

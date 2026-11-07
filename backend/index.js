@@ -9,6 +9,9 @@ const pacientesRoutes = require('./routes/pacientes.routes')
 const usuariosRoutes = require('./routes/usuarios.routes')
 const especialidadesRoutes = require('./routes/especialidades.routes')
 const sesionRoutes = require('./routes/sesion.routes')
+const medicosRoutes = require('./routes/medicos.routes')
+const serviciosRoutes = require('./routes/servicios.routes')
+const citasRoutes = require('./routes/citas.routes')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -40,6 +43,9 @@ app.use('/api/pacientes', pacientesRoutes)
 app.use('/api/usuarios', usuariosRoutes)
 app.use('/api/especialidades', especialidadesRoutes)
 app.use('/api/sesion', sesionRoutes)
+app.use('/api/medicos', medicosRoutes)
+app.use('/api/servicios', serviciosRoutes)
+app.use('/api/citas', citasRoutes)
 
 if (require.main === module) {
   app.listen(PORT, () => {

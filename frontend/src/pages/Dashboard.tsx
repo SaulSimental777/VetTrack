@@ -63,7 +63,7 @@ function Dashboard({ clinicId, clinicName }: { clinicId: string; clinicName: str
       <section className="dashboard-grid">
         <div className="panel">
           <div className="panel-header"><div><span className="eyebrow">Agenda</span><h3>Próximas citas</h3></div></div>
-          <p className="dashboard-placeholder">La agenda estará disponible cuando se habilite el módulo de citas.</p>
+          <div className="dashboard-placeholder">{can('citas.ver') ? <><p>Consulta las citas, los médicos y los horarios disponibles en la agenda de tu clínica.</p><button type="button" className="text-button" onClick={() => { window.location.hash = '/citas' }}>Abrir agenda</button></> : 'No tienes permiso para consultar la agenda.'}</div>
         </div>
         <div className="panel">
           <div className="panel-header"><div><span className="eyebrow">Actividad</span><h3>Actividad reciente</h3></div></div>

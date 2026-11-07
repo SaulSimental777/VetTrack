@@ -1,4 +1,4 @@
--- Run as postgres after Phase 2, with psql -X -v ON_ERROR_STOP=1.
+-- Run as postgres after Phase 2 or Phase 3, with psql -X -v ON_ERROR_STOP=1.
 -- Fixtures and every successful write are rolled back.
 BEGIN;
 CREATE FUNCTION pg_temp.assert_true(p_result boolean, p_message text) RETURNS void LANGUAGE plpgsql AS $$
@@ -60,12 +60,58 @@ BEGIN
     INSERT INTO public.mascota (id_mascota, nombre, id_dueno) VALUES
         (current_setting('vettrack.test.patient')::uuid, 'Patient A', current_setting('vettrack.test.owner')::uuid),
         (current_setting('vettrack.test.patient_b')::uuid, 'Patient B', current_setting('vettrack.test.owner_b')::uuid);
-    INSERT INTO public.cita (id_cita,fecha,id_dueno,id_mascota,id_veterinaria)
-    VALUES (current_setting('vettrack.test.appointment')::uuid,now(),current_setting('vettrack.test.owner')::uuid,current_setting('vettrack.test.patient')::uuid,tenant_a);
+    IF to_regprocedure('public.vettrack_guardar_cita(uuid,jsonb)') IS NOT NULL THEN
+        INSERT INTO public.cita (id_cita,fecha,fecha_inicio,fecha_fin,id_dueno,id_mascota,id_veterinaria)
+        VALUES (current_setting('vettrack.test.appointment')::uuid,now() AT TIME ZONE 'America/Tijuana',now(),now()+interval '30 minutes',
+            current_setting('vettrack.test.owner')::uuid,current_setting('vettrack.test.patient')::uuid,tenant_a);
+    ELSE
+        INSERT INTO public.cita (id_cita,fecha,id_dueno,id_mascota,id_veterinaria)
+        VALUES (current_setting('vettrack.test.appointment')::uuid,now(),current_setting('vettrack.test.owner')::uuid,current_setting('vettrack.test.patient')::uuid,tenant_a);
+    END IF;
     INSERT INTO public.diagnostico (id_diagnostico,descripcion,id_dueno,id_mascota,id_veterinaria)
     VALUES (current_setting('vettrack.test.diagnosis')::uuid,'Clinical information',current_setting('vettrack.test.owner')::uuid,current_setting('vettrack.test.patient')::uuid,tenant_a);
     INSERT INTO public.especialidad (id_especialidad, nombre, id_veterinaria) VALUES
         (current_setting('vettrack.test.specialty')::uuid, 'General', tenant_a), (current_setting('vettrack.test.specialty_b')::uuid, 'Other clinic', tenant_b);
+END;
+$$;
+
+-- Expected sets are independent of the stored defaults: a replaced key or an
+-- accidental extra grant must fail even when the total count stays unchanged.
+DO $$
+DECLARE
+    phase3 boolean := to_regprocedure('public.vettrack_guardar_cita(uuid,jsonb)') IS NOT NULL;
+    expected_catalog text[] := ARRAY[
+        'dashboard.ver','propietarios.ver','propietarios.crear','propietarios.editar','propietarios.eliminar',
+        'pacientes.ver','pacientes.crear','pacientes.editar','pacientes.eliminar',
+        'usuarios.ver','usuarios.crear','usuarios.editar','usuarios.desactivar','usuarios.permisos',
+        'citas.ver','citas.crear','citas.editar','citas.cancelar','citas.asignar_medico',
+        'consultas.ver','consultas.crear','consultas.editar','expediente.ver',
+        'diagnosticos.ver','diagnosticos.crear','diagnosticos.editar','recetas.ver','recetas.crear','recetas.editar',
+        'servicios.ver','servicios.administrar','horarios.ver','horarios.administrar',
+        'inventario.ver','inventario.administrar','inventario.vender','proveedores.ver','proveedores.administrar',
+        'compras.ver','compras.administrar','pagos.ver','pagos.crear','reportes.ver','configuracion.ver','configuracion.editar'
+    ];
+    expected_reception text[] := ARRAY[
+        'dashboard.ver','propietarios.ver','propietarios.crear','propietarios.editar',
+        'pacientes.ver','pacientes.crear','pacientes.editar','citas.ver','citas.crear','citas.editar','citas.cancelar','citas.asignar_medico',
+        'servicios.ver','horarios.ver','inventario.ver','inventario.vender','pagos.ver','pagos.crear'
+    ];
+    expected_doctor text[] := ARRAY[
+        'dashboard.ver','propietarios.ver','pacientes.ver','pacientes.crear','pacientes.editar','citas.ver','expediente.ver',
+        'consultas.ver','consultas.crear','consultas.editar','diagnosticos.ver','diagnosticos.crear','diagnosticos.editar',
+        'recetas.ver','recetas.crear','recetas.editar','inventario.ver'
+    ];
+BEGIN
+    IF phase3 THEN
+        expected_catalog := expected_catalog || ARRAY['medicos.ver','medicos.administrar','servicios.crear','servicios.editar','servicios.eliminar','servicios.editar_precio','citas.forzar_horario'];
+        expected_reception := expected_reception || ARRAY['medicos.ver'];
+        expected_doctor := expected_doctor || ARRAY['medicos.ver','horarios.ver','servicios.ver'];
+    END IF;
+    PERFORM pg_temp.assert_true((SELECT count(*) FROM public.permiso) = CASE WHEN phase3 THEN 52 ELSE 45 END, 'exact permission catalog count for the installed phase');
+    PERFORM pg_temp.assert_true(ARRAY(SELECT clave FROM public.permiso ORDER BY clave) = ARRAY(SELECT unnest(expected_catalog) ORDER BY 1), 'exact permission catalog keys');
+    PERFORM pg_temp.assert_true(ARRAY(SELECT clave FROM public.rol_permiso WHERE rol='admin' ORDER BY clave) = ARRAY(SELECT unnest(expected_catalog) ORDER BY 1), 'exact administrator defaults');
+    PERFORM pg_temp.assert_true(ARRAY(SELECT clave FROM public.rol_permiso WHERE rol='recepcionista' ORDER BY clave) = ARRAY(SELECT unnest(expected_reception) ORDER BY 1), 'exact receptionist defaults');
+    PERFORM pg_temp.assert_true(ARRAY(SELECT clave FROM public.rol_permiso WHERE rol='medico' ORDER BY clave) = ARRAY(SELECT unnest(expected_doctor) ORDER BY 1), 'exact doctor defaults');
 END;
 $$;
 SELECT pg_temp.state_capability('admin','admin',false);
@@ -137,7 +183,8 @@ SET LOCAL ROLE authenticated;
 DO $$
 DECLARE affected integer; owner_id uuid; patient_id uuid;
 BEGIN
-    PERFORM pg_temp.assert_true((SELECT count(*) FROM public.get_my_permissions()) = 18, 'receptionist defaults');
+    PERFORM pg_temp.assert_true((SELECT count(*) FROM public.get_my_permissions()) =
+        CASE WHEN to_regprocedure('public.vettrack_guardar_cita(uuid,jsonb)') IS NOT NULL THEN 19 ELSE 18 END, 'receptionist defaults');
     PERFORM pg_temp.assert_true(public.has_permission('pacientes.editar') AND NOT public.has_permission('pacientes.eliminar') AND NOT public.has_permission('usuarios.ver'), 'receptionist default restrictions');
     PERFORM pg_temp.assert_true((SELECT count(*) FROM public.cita) = 1 AND NOT EXISTS (SELECT 1 FROM public.diagnostico), 'receptionist cannot bypass clinical permission through dashboard tables');
     DELETE FROM public.mascota WHERE id_mascota = current_setting('vettrack.test.patient')::uuid;
@@ -203,7 +250,8 @@ SET LOCAL ROLE authenticated;
 DO $$
 DECLARE own_patient uuid; affected integer;
 BEGIN
-    PERFORM pg_temp.assert_true((SELECT count(*) FROM public.get_my_permissions()) = 16, 'doctor defaults minus owner override');
+    PERFORM pg_temp.assert_true((SELECT count(*) FROM public.get_my_permissions()) =
+        CASE WHEN to_regprocedure('public.vettrack_guardar_cita(uuid,jsonb)') IS NOT NULL THEN 19 ELSE 16 END, 'doctor defaults minus owner override');
     PERFORM pg_temp.assert_true((SELECT count(*) FROM public.diagnostico) = 1, 'doctor clinical read permission preserved');
     PERFORM pg_temp.assert_true((SELECT count(*) FROM public.dueno) = 0 AND (SELECT count(*) FROM public.mascota) >= 1, 'patient access independent of propietarios.ver');
     PERFORM pg_temp.assert_true((SELECT count(*) FROM public.vettrack_propietarios_pacientes()) >= 1, 'minimal owner selector available');

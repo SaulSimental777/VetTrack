@@ -1,6 +1,7 @@
 -- Phase 1 updates: PREPARED, NOT EXECUTED against Supabase.
 -- Review before running on the approved project yugbrcyrztwksiewzuvy.
 -- Requires the real schema, Phase 0 and 20261106_patients_module.sql applied.
+-- Also supports the approved Phase 2 and Phase 3 schema and privilege changes.
 -- Run as postgres in a dedicated session with psql ON_ERROR_STOP enabled.
 -- Every fixture and successful test write is discarded by the final ROLLBACK.
 BEGIN;
@@ -61,10 +62,17 @@ BEGIN
     INSERT INTO public.mascota (id_mascota, nombre, id_dueno)
     VALUES (patient_a, 'Patient A', owner_a), (patient_b, 'Patient B', owner_b);
 
-    INSERT INTO public.cita (id_cita, fecha, id_mascota, id_dueno, id_veterinaria)
-    VALUES
-        (appointment_a, timestamp '2030-01-01 10:00:00', patient_a, owner_a, tenant_a),
-        (appointment_b, timestamp '2030-01-01 11:00:00', patient_b, owner_b, tenant_b);
+    IF to_regprocedure('public.vettrack_guardar_cita(uuid,jsonb)') IS NOT NULL THEN
+        INSERT INTO public.cita (id_cita, fecha, fecha_inicio, fecha_fin, id_mascota, id_dueno, id_veterinaria)
+        VALUES
+            (appointment_a, timestamp '2030-01-01 10:00:00', timestamptz '2030-01-01 10:00:00 America/Tijuana', timestamptz '2030-01-01 10:30:00 America/Tijuana', patient_a, owner_a, tenant_a),
+            (appointment_b, timestamp '2030-01-01 11:00:00', timestamptz '2030-01-01 11:00:00 America/Tijuana', timestamptz '2030-01-01 11:30:00 America/Tijuana', patient_b, owner_b, tenant_b);
+    ELSE
+        INSERT INTO public.cita (id_cita, fecha, id_mascota, id_dueno, id_veterinaria)
+        VALUES
+            (appointment_a, timestamp '2030-01-01 10:00:00', patient_a, owner_a, tenant_a),
+            (appointment_b, timestamp '2030-01-01 11:00:00', patient_b, owner_b, tenant_b);
+    END IF;
     INSERT INTO public.diagnostico (id_diagnostico, descripcion, id_mascota, id_dueno, id_veterinaria)
     VALUES
         (diagnosis_a, 'RLS diagnosis A', patient_a, owner_a, tenant_a),
@@ -327,12 +335,24 @@ DECLARE
     table_name text;
     privilege_name text;
     registration_function record;
+    phase3 boolean := to_regprocedure('public.vettrack_guardar_cita(uuid,jsonb)') IS NOT NULL;
+    read_only_tables text[] := ARRAY['cita', 'diagnostico', 'metododepago'];
+    operational_tables text[] := ARRAY[]::text[];
 BEGIN
+    IF phase3 THEN
+        operational_tables := ARRAY['horario_medico', 'bloqueo_medico', 'servicio_especialidad', 'cita_servicio'];
+        read_only_tables := read_only_tables || ARRAY['servicio'] || operational_tables;
+        IF EXISTS (SELECT 1 FROM pg_catalog.pg_class
+            WHERE oid = ANY(ARRAY['public.servicio'::regclass, 'public.horario_medico'::regclass, 'public.bloqueo_medico'::regclass,
+                'public.servicio_especialidad'::regclass, 'public.cita_servicio'::regclass]) AND NOT relrowsecurity) THEN
+            RAISE EXCEPTION 'A Phase 3 operational table lost RLS';
+        END IF;
+    END IF;
     FOREACH table_name IN ARRAY ARRAY[
         'dueno', 'mascota', 'cita', 'diagnostico', 'historialmedico', 'receta',
         'producto', 'servicio', 'pago', 'experto', 'promocion', 'ubicacion',
         'valoracion', 'perfilusuario', 'veterinaria', 'metododepago', 'solicitudadopcion', 'refugio'
-    ] LOOP
+    ] || operational_tables LOOP
         FOREACH privilege_name IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'TRIGGER', 'REFERENCES'] LOOP
             IF has_table_privilege('anon', format('public.%I', table_name), privilege_name) THEN
                 RAISE EXCEPTION 'anon still has % on %', privilege_name, table_name;
@@ -355,12 +375,12 @@ BEGIN
         'mascota', 'cita', 'diagnostico', 'metododepago', 'historialmedico',
         'receta', 'producto', 'servicio', 'pago', 'experto', 'promocion',
         'ubicacion', 'valoracion', 'solicitudadopcion', 'refugio'
-    ] LOOP
+    ] || operational_tables LOOP
         FOREACH privilege_name IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'TRIGGER', 'REFERENCES'] LOOP
             IF has_table_privilege('authenticated', format('public.%I', table_name), privilege_name)
                IS DISTINCT FROM (
                    (table_name = 'mascota' AND privilege_name IN ('SELECT', 'INSERT', 'UPDATE', 'DELETE'))
-                   OR (table_name IN ('cita', 'diagnostico', 'metododepago') AND privilege_name = 'SELECT')
+                   OR (table_name = ANY(read_only_tables) AND privilege_name = 'SELECT')
                ) THEN
                 RAISE EXCEPTION 'Unexpected authenticated privilege % on %', privilege_name, table_name;
             END IF;
@@ -371,7 +391,7 @@ BEGIN
                 RAISE EXCEPTION 'Unexpected authenticated column privilege % on %', privilege_name, table_name;
             END IF;
         END LOOP;
-        IF table_name NOT IN ('mascota', 'cita', 'diagnostico', 'metododepago')
+        IF table_name <> 'mascota' AND NOT (table_name = ANY(read_only_tables))
            AND has_any_column_privilege('authenticated', format('public.%I', table_name), 'SELECT') THEN
             RAISE EXCEPTION 'Closed table % still has column SELECT', table_name;
         END IF;

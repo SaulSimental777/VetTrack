@@ -21,12 +21,18 @@ a { color:var(--brand); text-underline-offset:3px; }
 .app .topbar { min-height:91px; padding:18px clamp(18px,3vw,40px); border-bottom:1px solid var(--line); background:white; gap:18px; display:flex; align-items:center; justify-content:space-between; }
 .app .topbar h2 { font-size:18px; margin:2px 0 0; color:var(--ink); }
 .app .breadcrumb { font-size:11px; color:var(--muted); }
-.app .user-area { display:flex; align-items:center; gap:12px; min-width:0; }
+.app .workspace-title { min-width:0; flex:1; }
+.app .workspace-title :is(h2,.breadcrumb) { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.app .user-area { display:flex; align-items:center; gap:12px; min-width:0; margin-left:auto; }
+.app .user-info { min-width:0; max-width:190px; }
+.app .user-info :is(strong,span) { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .app .user-info strong { font-size:13px; display:block; color:var(--ink); }
 .app .user-info span { font-size:11px; color:var(--muted); }
-.app .user-avatar { width:39px; height:39px; display:grid; place-items:center; border-radius:50%; background:var(--brand-soft); color:var(--brand); font-weight:700; }
-.app .clinic { text-align:right; margin-right:9px; border-right:1px solid var(--line); padding-right:18px; }
-.app .clinic strong { display:block; max-width:190px; overflow-wrap:anywhere; font-size:12px; }
+.app .user-avatar { width:39px; height:39px; flex-shrink:0; display:grid; place-items:center; border-radius:50%; background:var(--brand-soft); color:var(--brand); font-weight:700; }
+.app .clinic { display:flex; flex-direction:row; align-items:center; gap:10px; min-width:0; text-align:left; margin-right:0; border-right:1px solid var(--line); padding-right:18px; }
+.app .clinic-info { min-width:0; }
+.app .clinic strong { display:block; max-width:190px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14px; margin:0; }
+.app .header-clinic-logo { display:block; flex:0 0 48px; width:48px; height:48px; object-fit:contain; padding:3px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
 .app .clinic-label { font-size:10px; color:var(--muted); }
 .app .content { padding:28px clamp(16px,3vw,40px) 48px; max-width:1700px; margin:auto; }
 .mobile-menu { display:none; align-items:center; justify-content:center; width:40px; height:40px; border:1px solid var(--line); border-radius:10px; background:white; color:var(--brand); }
@@ -119,7 +125,7 @@ input[type=checkbox] { accent-color:var(--brand); width:16px; height:16px; }
 .report-filters { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; padding:20px; }
 .report-filters>.users-field { flex:1; min-width:150px; }
 .clinical-entry:last-child { border-bottom:0; }
-@media(max-width:1100px) { .app .clinic { display:none; } .clinical-layout { grid-template-columns:150px minmax(0,1fr); gap:15px; } }
+@media(max-width:1100px) { .app .topbar:not(.topbar-clinic) .clinic { display:none; } .app .topbar-clinic .user-area { gap:8px; } .app .topbar-clinic .clinic { gap:8px; padding-right:12px; } .app .topbar-clinic .user-info { max-width:140px; } .app .topbar-clinic .user-logout .nav-label { display:none; } .clinical-layout { grid-template-columns:150px minmax(0,1fr); gap:15px; } }
 @media(max-width:900px) { .app .sidebar { position:fixed; left:-270px; top:0; bottom:0; z-index:60; width:244px; transition:left .2s; } .app.sidebar-open .sidebar { left:0; } .app.sidebar-open .sidebar-backdrop { display:block; position:fixed; inset:0; background:#0d2d2399; border:0; z-index:55; } .app .sidebar .brand div:last-child { display:block; } .app .sidebar .nav-item { justify-content:flex-start; } .app .sidebar .nav-label { position:static; width:auto; height:auto; clip-path:none; white-space:normal; overflow:visible; } .app .nav-section { display:block; } .mobile-menu { display:flex; flex-shrink:0; } .app .main-content { width:100%; } .app .topbar { flex-wrap:nowrap; gap:12px; padding:15px 18px; } .app .topbar h2 { font-size:16px; } .app .user-avatar { display:none; } .app .user-info { max-width:180px; } .app .user-info span { display:none; } .app .content { padding-top:23px; } .clinical-layout { grid-template-columns:1fr; } .clinical-nav { position:static; flex-direction:row; flex-wrap:wrap; margin-bottom:8px; } }
 @media(max-width:600px) { .app .user-info { max-width:110px; } .app .topbar .breadcrumb { display:none; } .app :is(.users-page-header,.duenos-header) h3 { font-size:24px; } .app :is(.users-card-header,.duenos-card-header) { padding:16px; } .users-form-grid,.summary-grid { grid-template-columns:1fr; } .wizard-steps { grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; } .wizard-steps button { font-size:11px; padding:9px; } :is(.users-dialog-body,.modal-body,.app .clinical-card) { padding:17px; } :is(.users-dialog-header,.modal-header) { padding:17px; } :is(.users-dialog-footer,.modal-footer) { padding:14px 17px; } .operations-toolbar { padding:16px; } .operations-week { grid-template-columns:1fr; } :is(.users-table,.duenos-table) { min-width:620px; } .dashboard-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } .metric-link { padding:16px; min-height:112px; } .metric-link span { font-size:11px; } .app .users-list-controls { width:100%; } .operations-actions { width:100%; } .operations-actions>button { flex:1; } }
 @media(max-width:900px) { .user-logout .nav-label { display:none; } .app .user-info span { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:10px; } }
@@ -131,9 +137,17 @@ input[type=checkbox] { accent-color:var(--brand); width:16px; height:16px; }
 .file-link { display:inline-flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .file-link a { color:var(--brand); font-size:13px; }
 .clinic-logo-preview { object-fit:contain; width:120px; height:90px; padding:8px; background:white; border:1px solid var(--line); border-radius:9px; display:block; margin:10px 0; }
-.sidebar-clinic-logo { padding:10px 24px 16px; display:flex; align-items:center; gap:12px; color:white; font-size:12px; }
-.sidebar-clinic-logo img { width:48px; height:48px; object-fit:contain; border-radius:8px; background:#fff; padding:5px; }
-.sidebar-clinic-logo span { overflow-wrap:anywhere; }
+.app .topbar-clinic .user-avatar { display:grid; }
+@media(max-width:600px) {
+ .app .topbar-clinic { gap:10px; padding:14px; }
+ .app .topbar-clinic .workspace-title { display:none; }
+ .app .topbar-clinic .user-area { flex:1; gap:8px; }
+ .app .topbar-clinic .clinic { flex:1; padding:0; border:0; }
+ .app .topbar-clinic .clinic-label { display:none; }
+ .app .topbar-clinic .clinic strong { max-width:none; }
+ .app .topbar-clinic .user-avatar { width:34px; height:34px; }
+ .app .topbar-clinic .user-info { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+}
 .support-reply { border-top:1px solid var(--line); padding:18px 0; }
 .support-reply small { display:block; color:var(--muted); margin-top:5px; }
 .preserve-lines { white-space:pre-wrap; overflow-wrap:anywhere; }

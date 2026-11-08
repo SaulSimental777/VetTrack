@@ -118,19 +118,21 @@ function Workspace({ session, clinic, role, userName, title, navigation, childre
           <div className="brand-icon" aria-hidden="true">V</div>
           <div><h1>VetTrack</h1><span>{clinic ? 'Gestión veterinaria' : 'Administración global'}</span></div>
         </div>
-        {logoArchivo && <div className="sidebar-clinic-logo"><StoredImage id={logoArchivo} alt={`Logo de ${clinic}`} /><span>{clinic}</span></div>}
         <nav className="navigation" aria-label="Navegación principal">{navigation}</nav>
       </aside>
       <main className="main-content">
-        <header className="topbar"><button type="button" className="mobile-menu" aria-label="Abrir navegación" aria-expanded={sidebar} onClick={() => setSidebar(value => !value)}><Icon name="menu" /></button>
-          <div>
+        <header className={`topbar${clinic ? ' topbar-clinic' : ''}`}><button type="button" className="mobile-menu" aria-label="Abrir navegación" aria-expanded={sidebar} onClick={() => setSidebar(value => !value)}><Icon name="menu" /></button>
+          <div className="workspace-title">
             <span className="breadcrumb">VetTrack / {clinic ? `${clinic} / ` : ''}{title}</span>
             <h2>{title}</h2>
           </div>
           <div className="user-area">
             <div className="clinic">
-              <span className="clinic-label">{clinic ? 'Clínica actual' : 'Administración'}</span>
-              <strong>{clinic || 'Todas las veterinarias'}</strong>
+              {clinic && logoArchivo && <StoredImage id={logoArchivo} alt={`Logo de ${clinic}`} className="header-clinic-logo" />}
+              <div className="clinic-info">
+                <span className="clinic-label">{clinic ? 'Clínica actual' : 'Administración'}</span>
+                <strong title={clinic || 'Todas las veterinarias'}>{clinic || 'Todas las veterinarias'}</strong>
+              </div>
             </div>
             <div className="user-avatar" aria-hidden="true">{email.charAt(0).toUpperCase()}</div>
             <div className="user-info">

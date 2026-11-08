@@ -1,0 +1,14 @@
+.pacientes-alert { color: #8b482c; background: #fff7ed; border: 1px solid #eedac2; border-radius: 8px; padding: 14px 18px; }
+.pacientes-search { display: grid; gap: 5px; font-size: 12px; color: #56625b; }
+.pacientes-search input { width: 280px; max-width: 100%; }
+.paciente-modal { max-height: calc(100dvh - 40px); overflow-y: auto; }
+.paciente-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.paciente-fields select { width: 100%; padding: 11px 12px; border: 1px solid #dce5e0; border-radius: 8px; font: inherit; background: #fafcfb; color: #263a30; }
+.paciente-fields select:focus { outline: 2px solid #2f8f5b; outline-offset: 2px; }
+.paciente-delete { background: #a53636; }
+.pacientes-page button:disabled { opacity: .55; cursor: not-allowed; }
+@media (max-width: 680px) {
+  .pacientes-page .duenos-header, .pacientes-page .duenos-card-header { align-items: stretch; flex-direction: column; gap: 15px; }
+  .pacientes-search input { width: 100%; }
+  .paciente-modal .form-row { flex-direction: column; display: flex; gap: 0; }
+}

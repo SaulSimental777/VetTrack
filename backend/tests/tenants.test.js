@@ -73,7 +73,7 @@ const response = () => ({
 const validBody = (changes = {}) => ({
   nombre: ' Clínica Nueva ',
   adminEmail: ' ADMIN@example.com ',
-  adminPassword: ' password with spaces ',
+  adminPassword: ' Password123 with spaces ',
   ...changes,
 })
 
@@ -215,20 +215,20 @@ test('POST creates the clinic, confirmed Auth account and admin profile without 
   assert.equal(inserted.telefono, null)
   assert.equal(inserted.direccion, null)
   const upsert = state.calls[1].methods.find(({ method }) => method === 'upsert')
-  assert.deepEqual(upsert.args, [{ id: 'new-user', rol: 'admin', id_veterinaria: inserted.id_veterinaria }, { onConflict: 'id' }])
+  assert.deepEqual(upsert.args, [{ id: 'new-user', nombre: 'Administrador', telefono: null, activo: true, rol: 'admin', id_veterinaria: inserted.id_veterinaria }, { onConflict: 'id' }])
   assert.deepEqual(res.body.tenant, { id_veterinaria: inserted.id_veterinaria, nombre: 'Clínica Nueva', telefono: null, direccion: null, adminEmail: 'admin@example.com' })
   assert.doesNotMatch(JSON.stringify(res.body), /password|user_metadata|super_admin/)
 })
 
-test('POST accepts the schema boundary lengths and preserves a password of eight spaces', async () => {
+test('POST accepts the schema boundary lengths and preserves spaces around a valid strong password', async () => {
   insertVeterinaria()
   state.auth.createUser = async (input) => {
-    assert.equal(input.password, '        ')
+    assert.equal(input.password, ' Vettrack123 ')
     return { data: { user: { id: 'new-user' } }, error: null }
   }
   state.queries.push({ table: 'perfilusuario', result: { error: null } })
   const res = response()
-  await crearTenant({ body: validBody({ nombre: 'x'.repeat(150), telefono: '1'.repeat(20), adminEmail: `${'x'.repeat(91)}@test.com`, adminPassword: '        ' }) }, res)
+  await crearTenant({ body: validBody({ nombre: 'x'.repeat(150), telefono: '1'.repeat(20), adminEmail: `${'x'.repeat(91)}@test.com`, adminPassword: ' Vettrack123 ' }) }, res)
   assert.equal(res.statusCode, 201)
 })
 

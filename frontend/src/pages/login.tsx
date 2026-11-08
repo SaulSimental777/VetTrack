@@ -43,7 +43,7 @@ function Login({ onLogin }: LoginProps) {
           <h1>VetTrack</h1>
 
           <p>
-            Sistema Multi-Tenant para la gestión
+            Atención, agenda e inventario para la gestión
             de clínicas veterinarias.
           </p>
 
@@ -64,7 +64,7 @@ function Login({ onLogin }: LoginProps) {
 
           <div className="login-feature">
             <span>✓</span>
-            Arquitectura Multi-Tenant
+            Acceso según tu rol
           </div>
         </div>
 
@@ -83,10 +83,10 @@ function Login({ onLogin }: LoginProps) {
           <form onSubmit={handleLogin}>
 
             <div className="form-group">
-              <label>Correo electrónico</label>
+              <label htmlFor="login-email">Correo electrónico</label>
 
               <input
-                type="email"
+                id="login-email" type="email" autoComplete="username"
                 placeholder="correo@ejemplo.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -95,10 +95,10 @@ function Login({ onLogin }: LoginProps) {
             </div>
 
             <div className="form-group">
-              <label>Contraseña</label>
+              <label htmlFor="login-password">Contraseña</label>
 
               <input
-                type="password"
+                id="login-password" type="password" autoComplete="current-password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

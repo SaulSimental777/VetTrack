@@ -529,6 +529,8 @@ button {
 
 /* Responsive */
 
+.access-denied { padding: 28px; }
+
 @media (max-width: 1100px) {
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);

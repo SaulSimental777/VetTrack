@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../lib/api'
+import { usePermissions } from '../lib/permissions'
 import './Duenos.css'
+import OwnerDetail from '../components/OwnerDetail'
+import type { PageResult } from '../lib/platform'
 
 interface Dueno {
   id_dueno: string
@@ -8,14 +11,21 @@ interface Dueno {
   telefono: string | null
   correo: string | null
   direccion: string | null
+  total_pacientes?: number | null
+  pacientes?: { id_mascota: string; nombre: string }[]
 }
 
 function Duenos() {
+  const { can } = usePermissions()
   const [duenos, setDuenos] = useState<Dueno[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const [busqueda, setBusqueda] = useState('')
+  const [offset,setOffset]=useState(0),[hasMore,setHasMore]=useState(false),[serverSummary,setServerSummary]=useState(false)
+  const [detail,setDetail]=useState<string|null>(new URLSearchParams(location.hash.split('?')[1]||'').get('propietario'))
+  const ownersEndpoint=`/api/duenos?resumen=1&offset=${offset}&q=${encodeURIComponent(busqueda)}`
+  const assignOwners=(data:Dueno[]|PageResult<Dueno>)=>{setServerSummary(!Array.isArray(data));setDuenos(Array.isArray(data)?data:data.filas);setHasMore(!Array.isArray(data)&&data.hay_mas)}
 
   const [modalAbierto, setModalAbierto] = useState(false)
   const [guardando, setGuardando] = useState(false)
@@ -35,9 +45,9 @@ const cargarDuenos = async () => {
 
   try {
     const data =
-      await apiFetch<Dueno[]>('/api/duenos')
+      await apiFetch<Dueno[]|PageResult<Dueno>>(ownersEndpoint)
 
-    setDuenos(data)
+    assignOwners(data)
   } catch (error) {
     console.error(
       'Error al cargar dueños:',
@@ -45,7 +55,7 @@ const cargarDuenos = async () => {
     )
 
     setError(
-      'No se pudieron cargar los dueños.'
+      'No se pudieron cargar los propietarios.'
     )
   } finally {
     setLoading(false)
@@ -55,13 +65,13 @@ const cargarDuenos = async () => {
   useEffect(() => {
     const controller = new AbortController()
 
-    apiFetch<Dueno[]>('/api/duenos', { signal: controller.signal })
+    apiFetch<Dueno[]|PageResult<Dueno>>(ownersEndpoint, { signal: controller.signal })
       .then(data => {
-        if (!controller.signal.aborted) setDuenos(data)
+        { if (!controller.signal.aborted) { setServerSummary(!Array.isArray(data));setDuenos(Array.isArray(data)?data:data.filas);setHasMore(!Array.isArray(data)&&data.hay_mas) } }
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setError('No se pudieron cargar los dueños.')
+          setError('No se pudieron cargar los propietarios.')
         }
       })
       .finally(() => {
@@ -69,7 +79,7 @@ const cargarDuenos = async () => {
       })
 
     return () => controller.abort()
-  }, [])
+  }, [ownersEndpoint])
 
   const limpiarFormulario = () => {
     setNombre('')
@@ -79,6 +89,7 @@ const cargarDuenos = async () => {
   }
 
   const abrirModal = () => {
+  if (!can('propietarios.crear')) return
   setDuenoEditando(null)
   limpiarFormulario()
   setError('')
@@ -86,6 +97,7 @@ const cargarDuenos = async () => {
 }
 
   const abrirModalEditar = (dueno: Dueno) => {
+  if (!can('propietarios.editar')) return
   setDuenoEditando(dueno)
 
   setNombre(dueno.nombre)
@@ -106,7 +118,7 @@ const cargarDuenos = async () => {
   limpiarFormulario()
 }
 
-  const duenosFiltrados = duenos.filter((dueno) => {
+  const duenosFiltrados = serverSummary ? duenos : duenos.filter((dueno) => {
   const texto = busqueda.toLowerCase().trim()
 
   return (
@@ -121,10 +133,11 @@ const cargarDuenos = async () => {
   e: React.FormEvent
 ) => {
   e.preventDefault()
+  if (!can(duenoEditando ? 'propietarios.editar' : 'propietarios.crear')) return
 
   if (!nombre.trim()) {
     setError(
-      'El nombre del dueño es obligatorio.'
+      'El nombre del propietario es obligatorio.'
     )
     return
   }
@@ -134,9 +147,9 @@ const cargarDuenos = async () => {
 
   const datosDueno = {
     nombre: nombre.trim(),
-    telefono: telefono.trim() || null,
-    correo: correo.trim() || null,
-    direccion: direccion.trim() || null,
+    telefono: telefono.trim(),
+    correo: correo.trim(),
+    direccion: direccion.trim(),
   }
 
   try {
@@ -170,7 +183,7 @@ const cargarDuenos = async () => {
     setError(
       error instanceof Error
         ? error.message
-        : 'No se pudo guardar el dueño.'
+        : 'No se pudo guardar el propietario.'
     )
   } finally {
     setGuardando(false)
@@ -178,7 +191,7 @@ const cargarDuenos = async () => {
 }
 
 const eliminarDueno = async () => {
-  if (!duenoEliminando) return
+  if (!duenoEliminando || !can('propietarios.eliminar')) return
 
   setEliminando(true)
   setError('')
@@ -203,7 +216,7 @@ const eliminarDueno = async () => {
     setError(
       error instanceof Error
         ? error.message
-        : 'No se pudo eliminar el dueño.'
+        : 'No se pudo eliminar el propietario.'
     )
   } finally {
     setEliminando(false)
@@ -214,40 +227,41 @@ const eliminarDueno = async () => {
     <div className="duenos-page">
       <div className="duenos-header">
         <div>
-          <span className="eyebrow">Pacientes / Dueños</span>
-          <h3>Dueños</h3>
+          <span className="eyebrow">Clínica / Propietarios</span>
+          <h3>Propietarios</h3>
           <p>
             Administra los propietarios registrados en tu clínica.
           </p>
         </div>
 
-        <button
+        {can('propietarios.crear') && <button
           className="primary-button"
           onClick={abrirModal}
         >
-          + Nuevo dueño
-        </button>
+          + Nuevo propietario
+        </button>}
       </div>
 
       <div className="duenos-card">
         <div className="duenos-card-header">
           <div>
-            <strong>Dueños registrados</strong>
+            <strong>Propietarios registrados</strong>
             <span>{duenos.length} registros</span>
           </div>
 
              <input
                 className="duenos-search"
-                type="text"
-                placeholder="Buscar dueño..."
+                type="search"
+                aria-label="Buscar propietario o paciente relacionado"
+                placeholder="Nombre, teléfono o inicio del nombre de paciente"
                 value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
+                onChange={(e) => {setBusqueda(e.target.value);setOffset(0)}}
                 />
             </div>
 
         {loading && (
           <div className="duenos-message">
-            Cargando dueños...
+            Cargando propietarios...
           </div>
         )}
 
@@ -261,18 +275,18 @@ const eliminarDueno = async () => {
           <div className="duenos-empty">
             <div className="duenos-empty-icon">♙</div>
 
-            <h4>No hay dueños registrados</h4>
+            <h4>No hay propietarios registrados</h4>
 
             <p>
               Esta clínica todavía no tiene propietarios registrados.
             </p>
 
-            <button
+            {can('propietarios.crear') && <button
               className="primary-button"
               onClick={abrirModal}
             >
-              + Registrar primer dueño
-            </button>
+              + Registrar primer propietario
+            </button>}
           </div>
         )}
 
@@ -285,7 +299,7 @@ const eliminarDueno = async () => {
                   <th>Teléfono</th>
                   <th>Correo</th>
                   <th>Dirección</th>
-                  <th>Acciones</th>
+                  <th>Pacientes</th><th>Acciones</th>
                 </tr>
               </thead>
 
@@ -305,17 +319,18 @@ const eliminarDueno = async () => {
                     <td>{dueno.telefono || '—'}</td>
                     <td>{dueno.correo || '—'}</td>
                     <td>{dueno.direccion || '—'}</td>
+                    <td className="owner-patient-summary">{dueno.total_pacientes == null ? 'Sin información de pacientes' : dueno.total_pacientes === 0 ? 'Sin pacientes' : <>{dueno.pacientes?.map(p=>p.nombre).join(', ')}{dueno.total_pacientes>2?` + ${dueno.total_pacientes-2} más`:''}<br/><small>{dueno.total_pacientes} {dueno.total_pacientes===1?'paciente':'pacientes'}</small></>}</td>
 
                     <td>
                       <div className="dueno-actions">
-                       <button onClick={() => abrirModalEditar(dueno)}>Editar</button>
+                       <button type="button" onClick={()=>setDetail(dueno.id_dueno)}>Ver</button>{can('propietarios.editar') && <button onClick={() => abrirModalEditar(dueno)}>Editar</button>}
 
-                        <button
+                        {can('propietarios.eliminar') && <button
                         className="danger"
                         onClick={() => setDuenoEliminando(dueno)}
                         >
                         Eliminar
-                        </button>
+                        </button>}
                       </div>
                     </td>
                   </tr>
@@ -326,6 +341,7 @@ const eliminarDueno = async () => {
         )}
       </div>
 
+<div className="operations-toolbar"><button type="button" className="users-secondary-button" disabled={!offset||loading} onClick={()=>setOffset(n=>Math.max(0,n-25))}>Anterior</button><span>Página {offset/25+1}</span><button type="button" className="users-secondary-button" disabled={!hasMore||loading} onClick={()=>setOffset(n=>n+25)}>Siguiente</button></div>{detail&&<OwnerDetail id={detail} onClose={()=>setDetail(null)} onChanged={()=>void cargarDuenos()}/>}
       {modalAbierto && (
         <div className="modal-overlay">
           <div className="dueno-modal">
@@ -337,7 +353,7 @@ const eliminarDueno = async () => {
                 </span>
 
                 <h3>
-                    {duenoEditando ? 'Editar dueño' : 'Registrar dueño'}
+                    {duenoEditando ? 'Editar propietario' : 'Registrar propietario'}
                 </h3>
               </div>
 
@@ -426,7 +442,7 @@ const eliminarDueno = async () => {
                     ? 'Guardando...'
                     : duenoEditando
                         ? 'Guardar cambios'
-                        : 'Guardar dueño'}
+                        : 'Guardar propietario'}
                 </button>
               </div>
                       </form>
@@ -443,7 +459,7 @@ const eliminarDueno = async () => {
             !
           </div>
 
-          <h3>Eliminar dueño</h3>
+          <h3>Eliminar propietario</h3>
 
           <p>
             ¿Estás seguro de que deseas eliminar a

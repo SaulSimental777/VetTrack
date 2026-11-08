@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:ui": "node tests/clinic-operations-ui.cjs && node tests/clinical-ui.cjs && node tests/inventory-ui.cjs && node tests/final-ux-ui.cjs && node tests/platform-ui.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

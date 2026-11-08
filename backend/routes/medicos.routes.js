@@ -1,0 +1,15 @@
+const express = require('express')
+const autenticarUsuario = require('../middleware/auth')
+const { loadClinicAccess, requirePermission, requireAnyPermission } = require('../middleware/permissions')
+const { obtenerMedicos, obtenerHorarios, guardarHorarios, obtenerBloqueos, crearBloqueo, eliminarBloqueo, obtenerDisponibilidad } = require('../controllers/medicos.controller')
+
+const router = express.Router()
+router.use(autenticarUsuario, loadClinicAccess)
+router.get('/', requirePermission('medicos.ver'), obtenerMedicos)
+router.get('/:id/horarios', requirePermission('horarios.ver'), obtenerHorarios)
+router.put('/:id/horarios', requirePermission('horarios.administrar'), guardarHorarios)
+router.get('/:id/bloqueos', requirePermission('horarios.ver'), obtenerBloqueos)
+router.post('/:id/bloqueos', requirePermission('horarios.administrar'), crearBloqueo)
+router.delete('/:id/bloqueos/:idBloqueo', requirePermission('horarios.administrar'), eliminarBloqueo)
+router.get('/:id/disponibilidad', requireAnyPermission('horarios.ver', 'citas.crear', 'citas.editar'), obtenerDisponibilidad)
+module.exports = router

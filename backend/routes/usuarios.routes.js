@@ -1,0 +1,15 @@
+const express = require('express')
+const autenticarUsuario = require('../middleware/auth')
+const { loadClinicAccess, requirePermission } = require('../middleware/permissions')
+const { obtenerUsuarios, crearUsuario, editarUsuario, cambiarPassword, cambiarEstado, obtenerPermisos, actualizarPermisos } = require('../controllers/usuarios.controller')
+
+const router = express.Router()
+router.use(autenticarUsuario, loadClinicAccess)
+router.get('/', requirePermission('usuarios.ver'), obtenerUsuarios)
+router.post('/', requirePermission('usuarios.crear'), crearUsuario)
+router.put('/:id', requirePermission('usuarios.editar'), editarUsuario)
+router.patch('/:id/estado', requirePermission('usuarios.desactivar'), cambiarEstado)
+router.put('/:id/password', requirePermission('usuarios.editar'), cambiarPassword)
+router.get('/:id/permisos', requirePermission('usuarios.permisos'), obtenerPermisos)
+router.put('/:id/permisos', requirePermission('usuarios.permisos'), actualizarPermisos)
+module.exports = router

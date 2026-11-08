@@ -25,23 +25,27 @@ const validarAlta = (body) => {
     throw errorOperacion(400, 'Los datos de la veterinaria son obligatorios')
   }
 
-  const { nombre, adminEmail, adminPassword, telefono, direccion } = body
+  const { nombre, adminEmail, adminPassword, telefono, direccion, adminNombre, adminTelefono } = body
+  if (body.crearAdmin !== undefined && typeof body.crearAdmin !== 'boolean') throw errorOperacion(400, 'Indica si deseas crear administrador inicial')
+  const crearAdmin = body.crearAdmin !== false
 
   if (typeof nombre !== 'string' || !nombre.trim() || nombre.trim().length > 150) {
     throw errorOperacion(400, 'El nombre debe contener entre 1 y 150 caracteres')
   }
 
-  if (
+  if (crearAdmin && (
     typeof adminEmail !== 'string' ||
     adminEmail.trim().length > 100 ||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim())
-  ) {
+  )) {
     throw errorOperacion(400, 'El correo del administrador debe ser válido y tener hasta 100 caracteres')
   }
 
-  if (typeof adminPassword !== 'string' || adminPassword.length < 8) {
-    throw errorOperacion(400, 'La contraseña del administrador debe tener al menos 8 caracteres')
+  if (crearAdmin && (typeof adminPassword !== 'string' || adminPassword.length < 8 || adminPassword.length > 128 || !/\p{Lu}/u.test(adminPassword) || !/\p{Ll}/u.test(adminPassword) || !/\p{Nd}/u.test(adminPassword))) {
+    throw errorOperacion(400, 'Mínimo 8 caracteres, con mayúscula, minúscula y número.')
   }
+  if (adminNombre !== undefined && (typeof adminNombre !== 'string' || !adminNombre.trim() || adminNombre.trim().length > 100)) throw errorOperacion(400, 'El nombre del administrador debe contener entre 1 y 100 caracteres')
+  if (adminTelefono != null && (typeof adminTelefono !== 'string' || adminTelefono.trim().length > 20)) throw errorOperacion(400, 'El teléfono del administrador admite hasta 20 caracteres')
 
   if (telefono != null && (typeof telefono !== 'string' || telefono.trim().length > 20)) {
     throw errorOperacion(400, 'El teléfono debe ser texto de hasta 20 caracteres')
@@ -53,9 +57,12 @@ const validarAlta = (body) => {
 
   return {
     nombre: nombre.trim(),
-    adminEmail: adminEmail.trim().toLowerCase(),
+    adminEmail: crearAdmin ? adminEmail.trim().toLowerCase() : null,
     // Passwords are intentionally preserved, including leading/trailing spaces.
     adminPassword,
+    crearAdmin,
+    adminNombre: adminNombre?.trim() || 'Administrador',
+    adminTelefono: adminTelefono?.trim() || null,
     telefono: telefono?.trim() || null,
     direccion: direccion?.trim() || null,
   }
@@ -173,6 +180,8 @@ const crearTenant = async (req, res) => {
       throw errorOperacion(502, 'No se pudo crear la veterinaria')
     }
 
+    if (!datos.crearAdmin) return res.status(201).json({ message: 'Veterinaria creada. Puedes agregar su administrador desde el detalle.', tenant: representarTenant(veterinaria, null) })
+
     const { data: cuenta, error: cuentaError } = await supabaseAdmin.auth.admin.createUser({
       email: datos.adminEmail,
       password: datos.adminPassword,
@@ -192,7 +201,10 @@ const crearTenant = async (req, res) => {
     // A database trigger may have inserted a default profile for this new user.
     const { error: perfilError } = await supabaseAdmin.from('perfilusuario').upsert({
       id: usuarioId,
+      nombre: datos.adminNombre,
+      telefono: datos.adminTelefono,
       rol: 'admin',
+      activo: true,
       id_veterinaria: veterinariaId,
     }, { onConflict: 'id' })
 

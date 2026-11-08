@@ -1,5 +1,6 @@
 const express = require('express')
 const autenticarUsuario = require('../middleware/auth')
+const { loadClinicAccess, requirePermission } = require('../middleware/permissions')
 const {
   obtenerDuenos,
   crearDueno,
@@ -10,10 +11,11 @@ const {
 const router = express.Router()
 
 router.use(autenticarUsuario)
+router.use(loadClinicAccess)
 
-router.get('/', obtenerDuenos)
-router.post('/', crearDueno)
-router.put('/:id', actualizarDueno)
-router.delete('/:id', eliminarDueno)
+router.get('/', requirePermission('propietarios.ver'), obtenerDuenos)
+router.post('/', requirePermission('propietarios.crear'), crearDueno)
+router.put('/:id', requirePermission('propietarios.editar'), actualizarDueno)
+router.delete('/:id', requirePermission('propietarios.eliminar'), eliminarDueno)
 
 module.exports = router

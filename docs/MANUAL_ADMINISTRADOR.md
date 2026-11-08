@@ -1,6 +1,22 @@
 # Manual de Administrador — VetTrack
 
-Frontend final de Fase 6, revisado el 7 de noviembre de 2026. Usa rutas y componentes finales. Describe defaults del catálogo real (82 permisos). usuario_permiso puede ampliar/restringir acciones; la matriz detalla requisitos. Todas las operaciones pertenecen a la clínica de sesión.
+Frontend de Fase 7, revisado el 8 de noviembre de 2026. Usa rutas y componentes finales. Describe defaults del catálogo real (82 permisos). usuario_permiso puede ampliar/restringir acciones; la matriz detalla requisitos. Todas las operaciones pertenecen a la clínica de sesión.
+
+## Cambios de operación en Fase 7
+
+**Propietarios (/propietarios).** La tabla muestra hasta dos nombres de pacientes y “+ N más”; “Sin pacientes” es válido. Busca por propietario o por el inicio del nombre de un paciente relacionado. El listado avanza con Anterior/Siguiente (25 propietarios por página). **Ver** abre Detalle del propietario con teléfono, correo, dirección y pacientes relacionados. **Ver paciente** consulta su ficha; **Editar paciente** exige pacientes.editar; **Ver expediente** exige expediente.ver y rol admin/médico. **+ Registrar paciente** mantiene al propietario preseleccionado: completa Nombre y Especie, pulsa **Guardar y seleccionar** y se actualizan la relación y su resumen. Las acciones y los datos de pacientes requieren sus permisos; propietarios.ver por sí solo no los habilita.
+
+**Citas (/citas).** **Hoy**, **Pendientes** y **Todas** mantienen filtros por fecha, médico, estado y búsqueda. Pendientes incluye citas anteriores todavía abiertas; Todas y Pendientes usan Anterior/Siguiente (50 por página). Elegir otro filtro vuelve a la primera página. No se cancela ninguna cita por el paso del tiempo.
+
+**Ayuda y soporte (/soporte).** **+ Nuevo ticket** captura Asunto, Categoría, Descripción, Prioridad, Módulo o pantalla y Adjunto opcional. **Crear ticket** registra automáticamente clínica, usuario, rol y fecha. **Ver ticket** muestra el Historial del ticket; escribe una respuesta y pulsa **Enviar respuesta**, con archivo opcional. Filtra por Estado y Prioridad y usa **Recargar** o Anterior/Siguiente. El administrador ve solicitudes de su clínica; otros usuarios solo las propias. Los estados son Abierto, En revisión, En proceso, Resuelto y Cerrado; el usuario de clínica no los cambia. Un ticket cerrado conserva su historial y deja de aceptar respuestas. Si la veterinaria está suspendida, el workspace conserva Ayuda y soporte y bloquea las operaciones normales hasta su reactivación.
+
+**Archivos.** **Seleccionar archivo** o arrastrar permite PDF, PNG o JPG/JPEG de hasta 10 MB; el logo solo PNG/JPG/JPEG de hasta 5 MB. Se muestran nombre, tamaño, tipo y estado. **Reemplazar**, **Quitar archivo** y **Ver archivo** aparecen según la selección. Espera “Archivo listo” antes de guardar el formulario. Quitar un archivo del borrador no elimina un documento histórico. Los archivos privados siguen los permisos de su registro; los enlaces HTTPS históricos siguen abriéndose. Si no hay logo o falla su carga, la aplicación conserva el nombre y la marca VetTrack.
+
+**Consultas (/clinica).** Citas de hoy, Citas pendientes anteriores y Próximas citas se muestran por separado. **Atrasada** identifica pendientes anteriores; **En consulta** indica una atención iniciada. Se conservan fechas y estados. Próxima cita sugerida no admite una fecha anterior al día local de inicio de consulta; se valida al guardar indicaciones y finalizar. Estudios usa Archivo adjunto y **Ver archivo**, también en Expediente. Los documentos nuevos (Nota de Consulta, Plan de Tratamiento, Orden de Cierre y Receta Simple) llevan encabezado, logo disponible, datos en columnas, secciones, firma, página X/Y y revisión. Los documentos históricos conservan sus snapshots y diseño previo.
+
+**Compras (/compras).** Estado filtra Pendiente, Recibida, Cancelada o No recibida. Solo las pendientes ofrecen **Recibir compra**, **Cancelar compra** y **Marcar no recibida**, según permiso. Para cancelar o marcar no recibida, revisa el proveedor y productos, escribe Motivo obligatorio y usa **Confirmar cancelación** o **Confirmar no recibida**. El cierre registra actor/fecha y conserva existencias, lotes y movimientos. Recibidas y cerradas no se vuelven a cerrar. Cancelar/no recibida exige compras.administrar; no se concede por defecto a recepción. **Recibir compra** permite adjuntar Documento del proveedor; confirma el resumen de recepción física. **Recepciones recientes** incluye exclusivamente compras recibidas y ofrece **Ver documento** cuando existe.
+
+**Configuración (/configuracion).** En **Identidad de la clínica**, selecciona Logo de la veterinaria y pulsa **Guardar logo**; **Reemplazar** crea una nueva versión. **Eliminar logo** requiere confirmación y retira la identidad actual. Los documentos emitidos conservan el logo histórico. El logo aparece en la navegación de la clínica, Configuración y nuevos PDFs. Modificarlo exige configuracion.editar; los usuarios de la clínica pueden verlo.
 
 ## Acceso y controles comunes
 
@@ -145,7 +161,7 @@ Ruta: `/clinica`. Fuente revisada: `frontend/src/pages/Clinica.tsx + ../lib/clin
 - **Descargar PDF:** Documentos disponibles según permiso: Nota de Consulta Veterinaria, Plan de Tratamiento, Receta Médica Veterinaria Simple y Orden de Cierre a Recepción.
 - **Volver:** Regresa a la lista sin cerrar la consulta.
 
-**Campos.** Evaluación: Motivo de consulta *; anamnesis, exploración física, temperatura, frecuencia cardiaca/respiratoria, mucosas, TRC, peso, observaciones y pronóstico. Indicaciones: indicaciones generales, próxima cita sugerida y observaciones administrativas. Diagnósticos: Tipo * y Diagnóstico *. Tratamientos: Tratamiento *; indicaciones, duración y observaciones. Vacunas: Vacuna *, Fecha de aplicación *; laboratorio, lote, próxima aplicación y observaciones. Desparasitación: Producto *, Dosis *, Fecha *; peso, próxima aplicación y observaciones. Estudios: Tipo *, Nombre *, Fecha *; resultado, observaciones y URL HTTPS. Receta: Medicamento *, Dosis *, Frecuencia *, Duración *, Vía de administración *, Cantidad * y Grupo de prescripción * por cada línea; principio activo, concentración, presentación, tiempo de retiro e indicaciones opcionales. Vincular medicamento de inventario es opcional. Reapertura: Motivo obligatorio.
+**Campos.** Evaluación: Motivo de consulta *; anamnesis, exploración física, temperatura, frecuencia cardiaca/respiratoria, mucosas, TRC, peso, observaciones y pronóstico. Indicaciones: indicaciones generales, próxima cita sugerida y observaciones administrativas. Diagnósticos: Tipo * y Diagnóstico *. Tratamientos: Tratamiento *; indicaciones, duración y observaciones. Vacunas: Vacuna *, Fecha de aplicación *; laboratorio, lote, próxima aplicación y observaciones. Desparasitación: Producto *, Dosis *, Fecha *; peso, próxima aplicación y observaciones. Estudios: Tipo *, Nombre *, Fecha *; resultado, observaciones y Archivo adjunto opcional (PDF, PNG o JPG/JPEG, hasta 10 MB). Receta: Medicamento *, Dosis *, Frecuencia *, Duración *, Vía de administración *, Cantidad * y Grupo de prescripción * por cada línea; principio activo, concentración, presentación, tiempo de retiro e indicaciones opcionales. Vincular medicamento de inventario es opcional. Reapertura: Motivo obligatorio.
 
 **Validaciones.** Iniciar exige cita atendible y médico activo asignado. El médico atiende sus consultas; tomar ajenas requiere permiso. Signos vitales, cantidades, fechas y HTTPS se validan. Recetar no descuenta existencias y permite medicamentos ajenos al inventario. Registrar aplicación y entregas físicas sí descuentan. Grupo I se conserva en expediente pero no se genera como receta simple; revisa documentos pendientes si faltan cédula/domicilio o clasificación. Una consulta finalizada queda sin edición. Reabrir exige motivo y orden aún no procesada.
 
@@ -357,7 +373,7 @@ Ruta: `/compras`. Fuente revisada: `frontend/src/pages/Inventario.tsx + Inventor
 - **Confirmar recepción física / Confirmar recepción:** Muestran proveedor, folio y líneas; confirman una vez.
 - **Documento del proveedor:** Abre enlace HTTPS si está disponible.
 
-**Campos.** Crear compra: Proveedor *, al menos un Producto *, Cantidad positiva y Costo unitario no negativo; referencia opcional. Recibir compra: Cantidad recibida y Precio unitario recibido por línea, lote/caducidad cuando apliquen. Fecha del documento, Folio del documento, Documento del proveedor (URL HTTPS) y Observaciones opcionales.
+**Campos.** Crear compra: Proveedor *, al menos un Producto *, Cantidad positiva y Costo unitario no negativo; referencia opcional. Recibir compra: Cantidad recibida y Precio unitario recibido por línea, lote/caducidad cuando apliquen. Fecha del documento, Folio del documento, Documento del proveedor (archivo PDF, PNG o JPG/JPEG, hasta 10 MB) y Observaciones opcionales.
 
 **Validaciones.** Guardar compra no aumenta stock. Recepción permite dividir cantidades entre lotes; la suma debe coincidir con la compra. Caducidad necesita lote. Documento HTTPS. Repetir recepción no duplica entradas.
 
@@ -428,9 +444,9 @@ Ruta: `/configuracion`. Fuente revisada: `frontend/src/pages/FinalOperations.tsx
 
 - **Guardar configuración:** Guarda datos generales solo de la clínica actual.
 
-**Campos.** Nombre de la clínica *; demás opcionales. Imagen de la clínica (URL HTTPS) es dirección, no carga de archivos.
+**Campos.** Nombre de la clínica *; demás opcionales. El logo se administra en Identidad de la clínica con selección de archivo y vista previa.
 
-**Validaciones.** Nombre hasta 150 caracteres; teléfono 20, correo/horario 100, dirección/URL 2000 y descripción 5000. Correo completo e imagen HTTPS. Sin configuracion.editar los campos son de consulta.
+**Validaciones.** Nombre hasta 150 caracteres; teléfono 20, correo/horario 100, dirección 2000 y descripción 5000. Correo completo; logo PNG o JPG/JPEG de hasta 5 MB. Sin configuracion.editar los campos son de consulta.
 
 **Resultado esperado.** Configuración guardada confirma persistencia y actualiza el nombre en cabecera.
 

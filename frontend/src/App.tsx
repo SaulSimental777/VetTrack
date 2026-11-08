@@ -5,7 +5,6 @@ import { supabase } from './lib/supabase'
 import Login from './pages/login'
 import Duenos from './pages/Duenos'
 import Pacientes from './pages/Pacientes'
-import Tenants from './pages/Tenants'
 import Dashboard from './pages/Dashboard'
 import Usuarios from './pages/Usuarios'
 import { apiFetch } from './lib/api'
@@ -15,6 +14,12 @@ import './App.css'
 import './design-system.css'
 import { ConfirmProvider } from './components/ConfirmProvider'
 import { Icon } from './components/Icon'
+import { StoredImage } from './components/FileUpload'
+
+const Support = lazy(() => import('./pages/Support'))
+const GlobalDashboard = lazy(() => import('./pages/Platform').then(m => ({ default: m.GlobalDashboard })))
+const GlobalTenants = lazy(() => import('./pages/Platform').then(m => ({ default: m.GlobalTenants })))
+const GlobalAccount = lazy(() => import('./pages/Platform').then(m => ({ default: m.GlobalAccount })))
 
 const Horarios = lazy(() => import('./pages/Horarios'))
 const Medicos = lazy(() => import('./pages/Medicos'))
@@ -46,6 +51,7 @@ const clinicRoutes = [
   { path: '/reportes', title: 'Reportes', permission: 'reportes.ver', icon: 'file' },
   { path: '/configuracion', title: 'Configuración', permission: 'configuracion.ver', icon: 'settings' },
   { path: '/configuracion/usuarios', title: 'Usuarios', permission: 'usuarios.ver', icon: 'settings' },
+  { path: '/soporte', title: 'Ayuda y soporte', permission: null, icon: 'file' },
 ] as const
 
 const currentClinicPath = () => window.location.hash.startsWith('#/')
@@ -92,7 +98,7 @@ function LogoutButton() {
   )
 }
 
-function Workspace({ session, clinic, role, userName, title, navigation, children }: {
+function Workspace({ session, clinic, role, userName, title, navigation, children, logoArchivo }: {
   session: Session
   clinic?: string
   role?: string
@@ -100,6 +106,7 @@ function Workspace({ session, clinic, role, userName, title, navigation, childre
   title: string
   navigation: ReactNode
   children: ReactNode
+  logoArchivo?: string | null
 }) {
   const [sidebar, setSidebar] = useState(false)
   const email = session.user.email || 'Sin correo electrónico'
@@ -109,8 +116,9 @@ function Workspace({ session, clinic, role, userName, title, navigation, childre
       <aside className="sidebar" onClick={event => { if ((event.target as HTMLElement).closest('button')) setSidebar(false) }}>
         <div className="brand">
           <div className="brand-icon" aria-hidden="true">V</div>
-          <div><h1>VetTrack</h1><span>Gestión veterinaria</span></div>
+          <div><h1>VetTrack</h1><span>{clinic ? 'Gestión veterinaria' : 'Administración global'}</span></div>
         </div>
+        {logoArchivo && <div className="sidebar-clinic-logo"><StoredImage id={logoArchivo} alt={`Logo de ${clinic}`} /><span>{clinic}</span></div>}
         <nav className="navigation" aria-label="Navegación principal">{navigation}</nav>
       </aside>
       <main className="main-content">
@@ -186,19 +194,21 @@ function ClinicWorkspace({ session }: { session: Session }) {
   if (error) return <SessionScreen message={error}><button type="button" className="primary-button" onClick={() => { void refresh().catch(() => {}) }}>Reintentar</button><div className="session-actions"><LogoutButton /></div></SessionScreen>
   if (!access) return <SessionScreen message="Verificando tu clínica y permisos…" />
   const route = clinicRoutes.find(item => item.path === path)
-  const visible = (item: typeof clinicRoutes[number]) => can(item.permission) && (!['/clinica','/expediente'].includes(item.path) || ['admin','medico'].includes(access.rol))
+  const visible = (item: typeof clinicRoutes[number]) => (!item.permission || can(item.permission)) && (!['/clinica','/expediente'].includes(item.path) || ['admin','medico'].includes(access.rol))
   const allowed = route && visible(route)
   const pageKey = `${access.id}:${access.id_veterinaria}:${access.rol}:${[...access.permisos].sort().join(',')}`
   const roleLabel = { admin: 'Administrador', recepcionista: 'Recepcionista', medico: 'Médico' }[access.rol]
 
+  if (access.estado === 'suspendido') return <PermissionsContext.Provider value={{ access, refresh, can }}><Workspace session={session} clinic={access.nombre_veterinaria} role={roleLabel} userName={access.nombre} title="Ayuda y soporte" navigation={<button type="button" className="nav-item active" aria-current="page" onClick={() => { window.location.hash='/soporte' }}><Icon name="file"/><span className="nav-label">Ayuda y soporte</span></button>}><p className="users-notice error" role="alert">Veterinaria suspendida. La operación clínica está pausada; puedes contactar a soporte. Los registros se conservan.</p><Suspense fallback={<p role="status">Cargando soporte…</p>}><Support/></Suspense></Workspace></PermissionsContext.Provider>
+
   return (
     <PermissionsContext.Provider value={{ access, refresh, can }}>
-    <Workspace session={session} clinic={access.nombre_veterinaria} role={roleLabel} userName={access.nombre} title={route?.title || 'Acceso no autorizado'} navigation={
+    <Workspace session={session} clinic={access.nombre_veterinaria} role={roleLabel} userName={access.nombre} logoArchivo={access.logo_archivo} title={route?.title || 'Acceso no autorizado'} navigation={
       <>
         {clinicRoutes.filter(visible).map(item => <div key={item.path}>
           {item.path === '/configuracion/usuarios' && <div className="nav-section">Configuración</div>}
           {item.path === '/medicos' && <div className="nav-section">Administración</div>}
-          <button type="button" className={`nav-item ${path === item.path ? 'active' : ''}`} aria-current={path === item.path ? 'page' : undefined} onClick={() => { window.location.hash = item.path }}>
+          <button type="button" className={`nav-item ${path === item.path ? 'active' : ''}`} aria-current={path === item.path ? 'page' : undefined} onClick={() => { window.location.hash = item.path === '/soporte' ? `/soporte?modulo=${encodeURIComponent(path)}` : item.path }}>
             <Icon name={item.icon} /><span className="nav-label">{item.title}</span>
           </button>
         </div>)}
@@ -223,12 +233,21 @@ function ClinicWorkspace({ session }: { session: Session }) {
           : path === '/pagos' ? <Pagos />
           : path === '/reportes' ? <Reportes />
           : path === '/configuracion' ? <Configuracion />
+          : path === '/soporte' ? <Support />
           : <Dashboard clinicId={access.id_veterinaria} clinicName={access.nombre_veterinaria} />}
         </Suspense>
       </div>
     </Workspace>
     </PermissionsContext.Provider>
   )
+}
+
+function GlobalWorkspace({ session }: { session: Session }) {
+  const [path,setPath]=useState(() => window.location.hash && currentClinicPath() !== '/dashboard' ? currentClinicPath() : '/superadmin/dashboard')
+  useEffect(() => { const changed=()=>setPath(currentClinicPath()); window.addEventListener('hashchange',changed); return()=>window.removeEventListener('hashchange',changed) },[])
+  const routes=[['/superadmin/dashboard','Dashboard','dashboard'],['/superadmin/veterinarias','Veterinarias','people'],['/superadmin/soporte','Soporte','file'],['/superadmin/cuenta','Mi cuenta','settings']]
+  const current=routes.find(([p])=>p===path)
+  return <Workspace session={session} role="Superadmin" userName={session.user.email} title={current?.[1] || 'Acceso no autorizado'} navigation={routes.map(([p,label,icon])=><button type="button" key={p} className={`nav-item ${p===path?'active':''}`} aria-current={p===path?'page':undefined} onClick={()=>{window.location.hash=p}}><Icon name={icon}/><span className="nav-label">{label}</span></button>)}><Suspense fallback={<p role="status">Cargando administración…</p>}>{path==='/superadmin/dashboard'?<GlobalDashboard/>:path==='/superadmin/veterinarias'?<GlobalTenants/>:path==='/superadmin/soporte'?<Support global/>:path==='/superadmin/cuenta'?<GlobalAccount/>:<div className="panel access-denied" role="alert"><h3>Acceso no autorizado</h3><p>Superadmin administra la plataforma. No tiene acceso clínico rutinario.</p></div>}</Suspense></Workspace>
 }
 
 function App() {
@@ -270,13 +289,7 @@ function App() {
   if (!session) return <Login onLogin={() => {}} />
 
   if (session.user.app_metadata.super_admin === true) {
-    return (
-      <Workspace key={`${session.user.id}:global`} session={session} title="Veterinarias" navigation={
-        <button type="button" className="nav-item active" aria-current="page"><span aria-hidden="true">▦</span><span className="nav-label">Veterinarias</span></button>
-      }>
-        <Tenants />
-      </Workspace>
-    )
+    return <GlobalWorkspace key={`${session.user.id}:global`} session={session}/>
   }
 
   return <ClinicWorkspace key={`${session.user.id}:clinic`} session={session} />

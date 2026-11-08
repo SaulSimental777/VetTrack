@@ -9,6 +9,8 @@ export interface ClinicAccess {
   rol: 'admin' | 'recepcionista' | 'medico'
   activo: boolean
   permisos: string[]
+  estado?: 'activo' | 'suspendido'
+  logo_archivo?: string | null
 }
 
 interface PermissionsContextValue {

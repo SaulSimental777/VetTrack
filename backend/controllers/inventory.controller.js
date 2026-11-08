@@ -2,12 +2,13 @@ const { validarCampos, validarId, texto, booleano, fecha, datoRPC, responderErro
 const documentFields = ['fecha_solicitud', 'fecha_documento', 'folio_documento', 'documento_url', 'observaciones']
 
 const specs = {
+  compra_cerrar: ['compras.administrar', ['id','estado','motivo']],
   productos: ['inventario.ver', []], medicamentos: ['medicamentos.ver', []], venta_catalogo: ['venta_libre.ver', []],
   producto_guardar: ['inventario.crear', ['id', 'nombre', 'descripcion', 'tipo_producto', 'sku', 'unidad', 'precio_compra', 'precio_venta', 'stock_minimo', 'activo', 'principio_activo', 'concentracion', 'presentacion', 'grupo_prescripcion', 'requiere_receta', 'tiempo_retiro_default']],
   movimientos: ['inventario.movimientos', ['id_producto']], mover: ['inventario.ajustar', ['id_producto', 'tipo', 'cantidad', 'idempotencia', 'motivo', 'referencia', 'numero_lote', 'fecha_caducidad']],
   uso_clinico: ['inventario.uso_clinico', ['id_producto', 'cantidad', 'idempotencia', 'motivo', 'id_consulta']],
   proveedores: ['proveedores.ver', []], proveedor_guardar: ['proveedores.crear', ['id', 'nombre', 'razon_social', 'rfc', 'telefono', 'correo', 'direccion', 'contacto', 'activo']],
-  compras: ['compras.ver', []], compra_crear: ['compras.crear', ['id_proveedor', 'referencia', 'motivo', 'detalles', ...documentFields]], compra_recibir: ['compras.recibir', ['id', 'recepciones', ...documentFields.filter(key => key !== 'fecha_solicitud')]],
+  compras: ['compras.ver', []], compra_crear: ['compras.crear', ['id_proveedor', 'referencia', 'motivo', 'detalles', ...documentFields]], compra_recibir: ['compras.recibir', ['id', 'documento_archivo', 'recepciones', ...documentFields.filter(key => key !== 'fecha_solicitud')]],
   ventas: ['venta_libre.ver', []], venta_preparar: ['venta_libre.preparar', ['referencia', 'detalles']], venta_entregar: ['inventario.entregar', ['id']],
   receta_entregar: ['inventario.entregar', ['id_orden', 'id_detalle']],
   entregas_receta: ['orden_recepcion.ver', ['id_orden']],
@@ -21,7 +22,8 @@ const validate = (op, body) => {
   validarCampos(body, specs[op][1])
   const data = {}
   for (const [key, value] of Object.entries(body)) {
-    if (key === 'id' || key.startsWith('id_') || key === 'idempotencia') data[key] = validarId(value)
+    if (key === 'documento_archivo') data[key] = value == null ? null : validarId(value)
+    else if (key === 'id' || key.startsWith('id_') || key === 'idempotencia') data[key] = validarId(value)
     else if (key === 'dias') {
       const days = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value
       if (!(op === 'lotes' ? [30, 60, 90] : [7, 30, 90]).includes(days)) fallar(400, 'Ventana de consulta no válida.')
@@ -57,7 +59,7 @@ const validate = (op, body) => {
   for (const [key, allowed] of Object.entries({ tipo_producto: ['medicamento', 'insumo', 'venta_libre'], tipo: ['entrada', 'salida', 'ajuste'], grupo_prescripcion: ['I', 'II', 'III', 'no_clasificado'] })) if (data[key] !== undefined && !allowed.includes(data[key])) fallar(400, 'Clasificación no válida.')
   if (data.correo && !/^[^\s@]+@[^\s@]+\.[^\s@.]{2,}$/.test(data.correo)) fallar(400, 'El correo no es válido.')
   if (data.cantidad === 0) fallar(400, 'La cantidad debe ser distinta de cero.')
-  if (data.estado !== undefined && !['todos', 'activos', 'caducados', 'proximos'].includes(data.estado)) fallar(400, 'Estado de lote no válido.')
+  if (data.estado !== undefined && !(op === 'compra_cerrar' ? ['cancelada','no_recibida'] : ['todos', 'activos', 'caducados', 'proximos']).includes(data.estado)) fallar(400, 'Estado de lote no válido.')
   if (data.numero_lote?.length > 100) fallar(400, 'El lote admite hasta 100 caracteres.')
   if (data.fecha_caducidad && !data.numero_lote) fallar(400, 'Indica el número de lote para registrar caducidad.')
   if (op === 'mover' && (Object.hasOwn(data, 'numero_lote') || Object.hasOwn(data, 'fecha_caducidad')) && data.tipo !== 'entrada') fallar(400, 'Los lotes se capturan en una entrada; las salidas usan FEFO.')
@@ -66,6 +68,7 @@ const validate = (op, body) => {
     try { url = new URL(data.documento_url) } catch { fallar(400, 'El documento debe usar una URL HTTPS válida.') }
     if (url.protocol !== 'https:' || !url.hostname || url.username || url.password) fallar(400, 'El documento debe usar una URL HTTPS válida.')
   }
+  if (op === 'compra_cerrar' && (!data.id || !data.estado || !data.motivo)) fallar(400, 'Selecciona una compra pendiente e indica el motivo del cierre.')
   return data
 }
 const execute = async (req, res) => {
@@ -82,6 +85,7 @@ const execute = async (req, res) => {
     if (result.error?.code === '23514' && result.error.message === 'Existencias insuficientes') fallar(409, 'Existencias insuficientes. Revisa el stock disponible.')
     if (result.error?.code === '23514' && result.error.message === 'Existencias vigentes insuficientes; hay lotes caducados o inactivos') fallar(409, 'No hay suficientes existencias vigentes. Revisa los lotes caducados o inactivos.')
     if (result.error?.code === '23514' && result.error.message === 'La recepción debe cubrir la cantidad solicitada') fallar(409, 'La suma de las cantidades recibidas debe coincidir con cada producto solicitado.')
+    if (result.error?.code === '23514' && ['Solo una compra pendiente admite cierre','La compra ya está cerrada'].includes(result.error.message)) fallar(409, 'La compra ya está cerrada. Solo una compra pendiente puede recibirse, cancelarse o marcarse no recibida.')
     return res.json(datoRPC(result))
   } catch (error) { return responderError(res, error) }
 }

@@ -58,6 +58,7 @@ deadline.unref();
     if(url.pathname==='/auth/v1/user')return json(current);
     if(url.pathname==='/api/sesion')return json({id:id(21),id_veterinaria:id(2),nombre:state.role==='medico'?'MVZ General':'Usuario Demo',rol:state.role,activo:true,nombre_veterinaria:state.settings.nombre,permisos:perms()});
     if(url.pathname==='/api/operacion/dashboard')return json({fecha:'2026-11-07',metricas:[{titulo:'Citas del día',valor:state.appointments.length,ruta:'/citas'},...(perms().includes('pagos.ver')?[{titulo:'Pagos pendientes',valor:state.paid?0:1,ruta:'/pagos'}]:[]),...(perms().includes('consultas.ver')?[{titulo:'Consultas en curso',valor:0,ruta:'/clinica'}]:[])],citas:[]});
+    if(url.pathname==='/api/plataforma/logo')return json({id_archivo:null});
     if(url.pathname==='/api/operacion/configuracion')return json(state.settings);
     if(url.pathname==='/api/operacion/configuracion_guardar'){Object.assign(state.settings,body);return json({guardado:true})}
     if(url.pathname==='/api/operacion/horarios_medicos')return json([doctor]);

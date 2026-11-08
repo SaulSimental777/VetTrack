@@ -1,5 +1,6 @@
 const { validarId, validarCampos, texto, fecha, booleano, entero, datoRPC, responderError, fallar } = require('./operacion.shared')
 const { generateClinicalPDF } = require('../services/clinical-pdf')
+const { loadDocumentLogo } = require('../services/document-logo')
 const checked = result => {
   if (result.error?.code === '22023') {
     const known = {
@@ -17,7 +18,7 @@ const forms = {
   tratamiento: { module: 'tratamientos', fields: ['descripcion', 'indicaciones', 'duracion', 'observaciones'], required: ['descripcion'] },
   vacuna: { module: 'vacunas', fields: ['nombre', 'laboratorio', 'lote', 'fecha_aplicacion', 'proxima_aplicacion', 'observaciones'], required: ['nombre', 'fecha_aplicacion'] },
   desparasitacion: { module: 'desparasitacion', fields: ['producto', 'dosis', 'peso', 'fecha', 'proxima_fecha', 'observaciones'], required: ['producto', 'dosis', 'fecha'] },
-  estudio: { module: 'estudios', fields: ['tipo', 'nombre', 'resultado', 'observaciones', 'fecha', 'archivo_url'], required: ['tipo', 'nombre', 'fecha'] },
+  estudio: { module: 'estudios', fields: ['tipo', 'nombre', 'resultado', 'observaciones', 'fecha', 'archivo_url', 'archivo_adjunto'], required: ['tipo', 'nombre', 'fecha'] },
 }
 const number = (value, max, min = 0, integer = false) => {
   if (value == null) return null
@@ -49,6 +50,7 @@ const recordBody = (kind, body) => {
   for (const key of spec.fields) {
     if (!Object.hasOwn(body, key) && !spec.required.includes(key)) continue
     if (['fecha', 'fecha_aplicacion', 'proxima_fecha', 'proxima_aplicacion'].includes(key)) data[key] = body[key] == null && !spec.required.includes(key) ? null : fecha(body[key])
+    else if (key === 'archivo_adjunto') data[key] = body[key] == null ? null : validarId(body[key])
     else if (key === 'peso') data[key] = number(body[key], 99999)
     else data[key] = texto(body[key], key.replaceAll('_', ' '), 20000, spec.required.includes(key))
   }
@@ -69,7 +71,7 @@ const list = run('vettrack_consultas', req => {
 })
 const get = run('vettrack_consulta', req => ({ p_id: validarId(req.params.id) }))
 const start = run('vettrack_iniciar_consulta', req => { noBody(req); return { p_cita: validarId(req.params.id) } })
-const save = run('vettrack_guardar_consulta', req => {
+const saveBody = req => {
   validarCampos(req.body, [...coreTexts, 'temperatura', 'frecuencia_cardiaca', 'frecuencia_respiratoria', 'peso', 'proxima_cita'])
   const data = {}
   for (const key of coreTexts) if (Object.hasOwn(req.body, key)) data[key] = texto(req.body[key], key.replaceAll('_', ' '), 20000, key === 'motivo_consulta')
@@ -78,7 +80,21 @@ const save = run('vettrack_guardar_consulta', req => {
   }
   if (Object.hasOwn(req.body, 'proxima_cita')) data.proxima_cita = req.body.proxima_cita == null ? null : fecha(req.body.proxima_cita)
   return { p_id: validarId(req.params.id), p_datos: data }
-})
+}
+const save = async (req,res) => {
+ try {
+  const args=saveBody(req)
+  if(args.p_datos.proxima_cita){
+   const current=checked(await req.supabase.rpc('vettrack_consulta',{p_id:args.p_id}))
+   const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Tijuana',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(current.consulta.fecha_inicio))
+   const date=['year','month','day'].map(key=>parts.find(p=>p.type===key).value).join('-')
+   if(args.p_datos.proxima_cita<date) fallar(400,'La próxima cita sugerida no puede ser anterior a la fecha de consulta.')
+  }
+  const result=await req.supabase.rpc('vettrack_guardar_consulta',args)
+  if(result.error?.message==='La próxima cita no puede ser anterior a la consulta')fallar(400,'La próxima cita sugerida no puede ser anterior a la fecha de consulta.')
+  return res.json(datoRPC(result))
+ }catch(error){return responderError(res,error)}
+}
 const record = async (req, res) => {
   try {
     const kind = req.params.tipo
@@ -109,7 +125,7 @@ const finish = async (req, res) => {
       if (meta.revision !== data.consulta.revision) continue
       try {
         const doc = datoRPC(await req.supabase.rpc('vettrack_documento_clinico', { p_id: meta.id_documento }))
-        await generateClinicalPDF(doc)
+        await generateClinicalPDF(doc, { logoBuffer: await loadDocumentLogo(req.supabase, doc) })
       } catch { pending = true }
     }
     return res.status(pending ? 202 : 200).json({ ...data, documentos_pendientes: pending })
@@ -141,7 +157,7 @@ const clinic = run('vettrack_datos_profesionales_clinica', req => {
 const document = async (req, res) => {
   try {
     const doc = datoRPC(await req.supabase.rpc('vettrack_documento_clinico', { p_id: validarId(req.params.id) }))
-    const pdf = await generateClinicalPDF(doc)
+    const pdf = await generateClinicalPDF(doc, { logoBuffer: await loadDocumentLogo(req.supabase, doc) })
     res.set('Content-Type', 'application/pdf').set('Cache-Control', 'private, no-store').set('X-Content-Type-Options', 'nosniff')
     res.set('Content-Disposition', `attachment; filename="vettrack-${doc.tipo}-${doc.id_documento}.pdf"`)
     return res.send(pdf)

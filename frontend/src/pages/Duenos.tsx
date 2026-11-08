@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { apiFetch } from '../lib/api'
 import { usePermissions } from '../lib/permissions'
 import './Duenos.css'
+import OwnerDetail from '../components/OwnerDetail'
+import type { PageResult } from '../lib/platform'
 
 interface Dueno {
   id_dueno: string
@@ -9,6 +11,8 @@ interface Dueno {
   telefono: string | null
   correo: string | null
   direccion: string | null
+  total_pacientes?: number | null
+  pacientes?: { id_mascota: string; nombre: string }[]
 }
 
 function Duenos() {
@@ -18,6 +22,10 @@ function Duenos() {
   const [error, setError] = useState('')
 
   const [busqueda, setBusqueda] = useState('')
+  const [offset,setOffset]=useState(0),[hasMore,setHasMore]=useState(false),[serverSummary,setServerSummary]=useState(false)
+  const [detail,setDetail]=useState<string|null>(new URLSearchParams(location.hash.split('?')[1]||'').get('propietario'))
+  const ownersEndpoint=`/api/duenos?resumen=1&offset=${offset}&q=${encodeURIComponent(busqueda)}`
+  const assignOwners=(data:Dueno[]|PageResult<Dueno>)=>{setServerSummary(!Array.isArray(data));setDuenos(Array.isArray(data)?data:data.filas);setHasMore(!Array.isArray(data)&&data.hay_mas)}
 
   const [modalAbierto, setModalAbierto] = useState(false)
   const [guardando, setGuardando] = useState(false)
@@ -37,9 +45,9 @@ const cargarDuenos = async () => {
 
   try {
     const data =
-      await apiFetch<Dueno[]>('/api/duenos')
+      await apiFetch<Dueno[]|PageResult<Dueno>>(ownersEndpoint)
 
-    setDuenos(data)
+    assignOwners(data)
   } catch (error) {
     console.error(
       'Error al cargar dueños:',
@@ -57,9 +65,9 @@ const cargarDuenos = async () => {
   useEffect(() => {
     const controller = new AbortController()
 
-    apiFetch<Dueno[]>('/api/duenos', { signal: controller.signal })
+    apiFetch<Dueno[]|PageResult<Dueno>>(ownersEndpoint, { signal: controller.signal })
       .then(data => {
-        if (!controller.signal.aborted) setDuenos(data)
+        { if (!controller.signal.aborted) { setServerSummary(!Array.isArray(data));setDuenos(Array.isArray(data)?data:data.filas);setHasMore(!Array.isArray(data)&&data.hay_mas) } }
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -71,7 +79,7 @@ const cargarDuenos = async () => {
       })
 
     return () => controller.abort()
-  }, [])
+  }, [ownersEndpoint])
 
   const limpiarFormulario = () => {
     setNombre('')
@@ -110,7 +118,7 @@ const cargarDuenos = async () => {
   limpiarFormulario()
 }
 
-  const duenosFiltrados = duenos.filter((dueno) => {
+  const duenosFiltrados = serverSummary ? duenos : duenos.filter((dueno) => {
   const texto = busqueda.toLowerCase().trim()
 
   return (
@@ -243,10 +251,11 @@ const eliminarDueno = async () => {
 
              <input
                 className="duenos-search"
-                type="text"
-                placeholder="Buscar propietario..."
+                type="search"
+                aria-label="Buscar propietario o paciente relacionado"
+                placeholder="Nombre, teléfono o inicio del nombre de paciente"
                 value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
+                onChange={(e) => {setBusqueda(e.target.value);setOffset(0)}}
                 />
             </div>
 
@@ -290,7 +299,7 @@ const eliminarDueno = async () => {
                   <th>Teléfono</th>
                   <th>Correo</th>
                   <th>Dirección</th>
-                  <th>Acciones</th>
+                  <th>Pacientes</th><th>Acciones</th>
                 </tr>
               </thead>
 
@@ -310,10 +319,11 @@ const eliminarDueno = async () => {
                     <td>{dueno.telefono || '—'}</td>
                     <td>{dueno.correo || '—'}</td>
                     <td>{dueno.direccion || '—'}</td>
+                    <td className="owner-patient-summary">{dueno.total_pacientes == null ? 'Sin información de pacientes' : dueno.total_pacientes === 0 ? 'Sin pacientes' : <>{dueno.pacientes?.map(p=>p.nombre).join(', ')}{dueno.total_pacientes>2?` + ${dueno.total_pacientes-2} más`:''}<br/><small>{dueno.total_pacientes} {dueno.total_pacientes===1?'paciente':'pacientes'}</small></>}</td>
 
                     <td>
                       <div className="dueno-actions">
-                       {can('propietarios.editar') && <button onClick={() => abrirModalEditar(dueno)}>Editar</button>}
+                       <button type="button" onClick={()=>setDetail(dueno.id_dueno)}>Ver</button>{can('propietarios.editar') && <button onClick={() => abrirModalEditar(dueno)}>Editar</button>}
 
                         {can('propietarios.eliminar') && <button
                         className="danger"
@@ -331,6 +341,7 @@ const eliminarDueno = async () => {
         )}
       </div>
 
+<div className="operations-toolbar"><button type="button" className="users-secondary-button" disabled={!offset||loading} onClick={()=>setOffset(n=>Math.max(0,n-25))}>Anterior</button><span>Página {offset/25+1}</span><button type="button" className="users-secondary-button" disabled={!hasMore||loading} onClick={()=>setOffset(n=>n+25)}>Siguiente</button></div>{detail&&<OwnerDetail id={detail} onClose={()=>setDetail(null)} onChanged={()=>void cargarDuenos()}/>}
       {modalAbierto && (
         <div className="modal-overlay">
           <div className="dueno-modal">

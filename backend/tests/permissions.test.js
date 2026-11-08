@@ -17,6 +17,7 @@ const userClient = {
     return builder
   },
   async rpc(name) {
+    if (name === 'vettrack_plataforma') return { data: { nombre_veterinaria: 'Clínica de prueba', estado: state.clinicState || 'activo', logo_archivo: null }, error: null }
     assert.equal(name, 'get_my_permissions')
     return { data: state.permissions, error: state.permissionsError }
   },
@@ -64,6 +65,7 @@ beforeEach(() => {
   state.permissions = []
   state.permissionsError = null
   state.appMetadata = {}
+  state.clinicState = 'activo'
 })
 const call = (path, method = 'GET', token = 'valid-jwt') => fetch(`${baseUrl}${path}`, {
   method,
@@ -141,4 +143,14 @@ test('session API returns only current clinic access without requiring dashboard
   assert.equal(data.nombre_veterinaria, 'Clínica de prueba')
   assert.deepEqual(data.permisos, [])
   assert.doesNotMatch(JSON.stringify(data), /token|password|app_metadata/)
+})
+
+test('suspended clinic session retains only identity and support context with no functional permissions', async () => {
+  state.clinicState = 'suspendido'
+  const response = await call('/api/sesion')
+  assert.equal(response.status, 200)
+  const data = await response.json()
+  assert.equal(data.estado, 'suspendido')
+  assert.deepEqual(data.permisos, [])
+  assert.equal(data.nombre_veterinaria, 'Clínica de prueba')
 })

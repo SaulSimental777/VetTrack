@@ -28,6 +28,15 @@ const validarPropietario = (body) => {
 
 const obtenerDuenos = async (req, res) => {
   try {
+    if (req.query?.resumen === '1') {
+      const { texto, entero, datoRPC, responderError } = require('./operacion.shared')
+      try {
+        const offset = req.query.offset === undefined ? 0 : Number(req.query.offset)
+        const data = { q: texto(req.query.q, 'La búsqueda', 150), offset: entero(offset, 0, 100000, 'La página') }
+        const result = await (req.supabase || createUserClient(req.accessToken)).rpc('vettrack_plataforma', { p_operacion: 'propietarios_resumen', p_datos: data })
+        return res.json(datoRPC(result))
+      } catch (error) { return responderError(res, error) }
+    }
     const supabase = createUserClient(req.accessToken)
 
     const { data, error } = await supabase

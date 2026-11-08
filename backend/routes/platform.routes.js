@@ -1,0 +1,10 @@
+const router=require('express').Router()
+const auth=require('../middleware/auth')
+const c=require('../controllers/platform.controller')
+router.use(auth)
+router.get('/mi-cuenta',c.account)
+router.post('/mi-cuenta/password',c.ownPassword)
+router.post('/tenants/:tenant/administradores/:accion',c.administrator)
+router.get('/:operacion',c.execute)
+router.post('/:operacion',c.execute)
+module.exports=router

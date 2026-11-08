@@ -1,6 +1,16 @@
 # Manual de Recepcionista — VetTrack
 
-Frontend final de Fase 6, revisado el 7 de noviembre de 2026. Usa rutas y componentes finales. Describe defaults del catálogo real (25 permisos). usuario_permiso puede ampliar/restringir acciones; la matriz detalla requisitos. Todas las operaciones pertenecen a la clínica de sesión.
+Frontend de Fase 7, revisado el 8 de noviembre de 2026. Usa rutas y componentes finales. Describe defaults del catálogo real (25 permisos). usuario_permiso puede ampliar/restringir acciones; la matriz detalla requisitos. Todas las operaciones pertenecen a la clínica de sesión.
+
+## Cambios de operación en Fase 7
+
+**Propietarios (/propietarios).** La tabla muestra hasta dos nombres de pacientes y “+ N más”; “Sin pacientes” es válido. Busca por propietario o por el inicio del nombre de un paciente relacionado. El listado avanza con Anterior/Siguiente (25 propietarios por página). **Ver** abre Detalle del propietario con teléfono, correo, dirección y pacientes relacionados. **Ver paciente** consulta su ficha; **Editar paciente** exige pacientes.editar; **Ver expediente** exige expediente.ver y rol admin/médico. **+ Registrar paciente** mantiene al propietario preseleccionado: completa Nombre y Especie, pulsa **Guardar y seleccionar** y se actualizan la relación y su resumen. Las acciones y los datos de pacientes requieren sus permisos; propietarios.ver por sí solo no los habilita.
+
+**Citas (/citas).** **Hoy**, **Pendientes** y **Todas** mantienen filtros por fecha, médico, estado y búsqueda. Pendientes incluye citas anteriores todavía abiertas; Todas y Pendientes usan Anterior/Siguiente (50 por página). Elegir otro filtro vuelve a la primera página. No se cancela ninguna cita por el paso del tiempo.
+
+**Ayuda y soporte (/soporte).** **+ Nuevo ticket** captura Asunto, Categoría, Descripción, Prioridad, Módulo o pantalla y Adjunto opcional. **Crear ticket** registra automáticamente clínica, usuario, rol y fecha. **Ver ticket** muestra el Historial del ticket; escribe una respuesta y pulsa **Enviar respuesta**, con archivo opcional. Filtra por Estado y Prioridad y usa **Recargar** o Anterior/Siguiente. El administrador ve solicitudes de su clínica; otros usuarios solo las propias. Los estados son Abierto, En revisión, En proceso, Resuelto y Cerrado; el usuario de clínica no los cambia. Un ticket cerrado conserva su historial y deja de aceptar respuestas. Si la veterinaria está suspendida, el workspace conserva Ayuda y soporte y bloquea las operaciones normales hasta su reactivación.
+
+**Archivos.** **Seleccionar archivo** o arrastrar permite PDF, PNG o JPG/JPEG de hasta 10 MB; el logo solo PNG/JPG/JPEG de hasta 5 MB. Se muestran nombre, tamaño, tipo y estado. **Reemplazar**, **Quitar archivo** y **Ver archivo** aparecen según la selección. Espera “Archivo listo” antes de guardar el formulario. Quitar un archivo del borrador no elimina un documento histórico. Los archivos privados siguen los permisos de su registro; los enlaces HTTPS históricos siguen abriéndose. Si no hay logo o falla su carga, la aplicación conserva el nombre y la marca VetTrack.
 
 ## Acceso y controles comunes
 

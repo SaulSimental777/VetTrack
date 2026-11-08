@@ -126,7 +126,7 @@ function UserActionIcon({ type }: { type: 'key' | 'password' }) {
   </svg>
 }
 
-function PasswordFields({ password, confirmation, onPassword, onConfirmation, prefix }: {
+export function PasswordFields({ password, confirmation, onPassword, onConfirmation, prefix }: {
   password: string
   confirmation: string
   onPassword: (value: string) => void

@@ -1,5 +1,5 @@
 import { SearchableSelect } from '../components/SearchableSelect'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import { apiFetch } from '../lib/api'
 import { usePermissions } from '../lib/permissions'
@@ -36,6 +36,9 @@ function Pacientes() {
   const [pending, setPending] = useState(false)
   const [modalError, setModalError] = useState('')
   const [form, setForm] = useState(emptyForm)
+  const [viewOnly,setViewOnly]=useState(false)
+  const [requested]=useState(()=>new URLSearchParams(location.hash.split('?')[1]||''))
+  const requestedHandled=useRef(false)
   const focusReturn = useRef<HTMLElement | null>(null)
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const modalOpen = Boolean(editor || eliminando)
@@ -74,8 +77,9 @@ function Pacientes() {
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
   }
-  const openEditor = (paciente: Paciente | null) => {
-    if (!can(paciente ? 'pacientes.editar' : 'pacientes.crear')) return
+  const openEditor = useCallback((paciente: Paciente | null, readonly = false) => {
+    if (!can(readonly ? 'pacientes.ver' : paciente ? 'pacientes.editar' : 'pacientes.crear')) return
+    setViewOnly(readonly)
     focusReturn.current = document.activeElement as HTMLElement
     setModalError('')
     setForm(paciente ? {
@@ -85,7 +89,13 @@ function Pacientes() {
       observaciones: paciente.observaciones ?? '',
     } : emptyForm)
     setEditor({ paciente })
-  }
+  },[can])
+  useEffect(()=>{
+    if(loading||requestedHandled.current||!requested.get('paciente'))return
+    const patient=pacientes.find(p=>p.id_mascota===requested.get('paciente'))
+    const frame=requestAnimationFrame(()=>{requestedHandled.current=true;if(patient)openEditor(patient,requested.get('editar')!=='1'||!can('pacientes.editar'))})
+    return()=>cancelAnimationFrame(frame)
+  },[loading,pacientes,requested,openEditor,can])
   const refresh = async () => {
     try {
       setPacientes(await apiFetch<Paciente[]>('/api/pacientes'))
@@ -94,7 +104,7 @@ function Pacientes() {
   }
   const save = async (event: FormEvent) => {
     event.preventDefault()
-    if (!editor || pending) return
+    if (!editor || pending || viewOnly) return
     if (!can(editor.paciente ? 'pacientes.editar' : 'pacientes.crear')) return
     if (!form.nombre.trim() || !form.id_dueno) { setModalError('Completa el nombre y selecciona un propietario.'); return }
     if (form.fecha_nacimiento && form.fecha_nacimiento > today()) { setModalError('La fecha de nacimiento no puede ser futura.'); return }
@@ -155,11 +165,11 @@ function Pacientes() {
       </div>
       {modalOpen && <div className="modal-overlay">
         <div className="dueno-modal paciente-modal" role="dialog" aria-modal="true" aria-labelledby="patient-dialog-title" aria-describedby={modalError ? 'patient-dialog-error' : undefined} ref={dialogRef} onKeyDown={dialogKeys}>
-          <div className="modal-header"><div><span className="eyebrow">Pacientes</span><h3 id="patient-dialog-title">{eliminando ? 'Eliminar paciente' : editor?.paciente ? 'Editar paciente' : 'Registrar paciente'}</h3></div>
+          <div className="modal-header"><div><span className="eyebrow">Pacientes</span><h3 id="patient-dialog-title">{eliminando ? 'Eliminar paciente' : viewOnly ? 'Ver paciente' : editor?.paciente ? 'Editar paciente' : 'Registrar paciente'}</h3></div>
             <button className="modal-close" type="button" aria-label="Cerrar" onClick={closeModal} disabled={pending}>×</button></div>
           {editor ? <form onSubmit={save}>
             <div className="modal-body">
-              <fieldset disabled={pending} className="paciente-fields">
+              <fieldset disabled={pending || viewOnly} className="paciente-fields">
                 <div className="form-group"><label htmlFor="patient-name">Nombre *</label><input id="patient-name" required maxLength={100} value={form.nombre} onChange={event => field('nombre', event.target.value)} /></div>
                 <div className="form-group"><label htmlFor="patient-owner">Propietario *</label><SearchableSelect id="patient-owner" required value={form.id_dueno} onChange={event => field('id_dueno', event.target.value)}><option value="">Selecciona un propietario</option>{propietarios.map(owner => <option key={owner.id_dueno} value={owner.id_dueno}>{owner.nombre}</option>)}</SearchableSelect></div>
                 <div className="form-row">
@@ -175,7 +185,7 @@ function Pacientes() {
               </fieldset>
               {modalError && <p className="modal-error" id="patient-dialog-error" role="alert">{modalError}</p>}
             </div>
-            <div className="modal-footer"><button type="button" className="secondary-button" onClick={closeModal} disabled={pending}>Cancelar</button><button className="primary-button" type="submit" disabled={pending}>{pending ? 'Guardando…' : 'Guardar paciente'}</button></div>
+            <div className="modal-footer"><button type="button" className="secondary-button" onClick={closeModal} disabled={pending}>{viewOnly ? 'Cerrar' : 'Cancelar'}</button>{!viewOnly && <button className="primary-button" type="submit" disabled={pending}>{pending ? 'Guardando…' : 'Guardar paciente'}</button>}</div>
           </form> : <><div className="modal-body"><p>¿Eliminar a <strong>{eliminando?.nombre}</strong>?</p><p>Solo se puede eliminar un paciente sin información relacionada. Esta acción no se puede deshacer.</p>{modalError && <p className="modal-error" id="patient-dialog-error" role="alert">{modalError}</p>}</div>
             <div className="modal-footer"><button type="button" className="secondary-button" onClick={closeModal} disabled={pending}>Cancelar</button><button type="button" className="primary-button paciente-delete" onClick={remove} disabled={pending}>{pending ? 'Eliminando…' : 'Eliminar paciente'}</button></div></>}
         </div>

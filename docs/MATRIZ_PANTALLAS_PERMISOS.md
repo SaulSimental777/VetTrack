@@ -1,6 +1,6 @@
 # Matriz de pantallas y permisos — VetTrack
 
-Revisada contra clinicRoutes de App.tsx, componentes finales y catálogo real: 82 permisos; admin 82, recepcionista 25, médico 36. Sí/No son defaults; usuario_permiso puede permitir/denegar salvo restricciones de rol. Todos exigen sesión activa y Tenant. `&` exige ambos; `/` separa permisos de distintas acciones agrupadas o tipos de documento. Cada acción necesita además el permiso de su ruta.
+Revisada contra clinicRoutes de App.tsx, componentes finales y catálogo real: 82 permisos; admin 82, recepcionista 25, médico 36. Sí/No son defaults; usuario_permiso puede permitir/denegar salvo restricciones de rol. Las pantallas de clínica exigen sesión activa y Tenant activo; soporte admite el Tenant suspendido con perfil activo. `&` exige ambos; `/` separa permisos de distintas acciones agrupadas o tipos de documento. Cada acción necesita además el permiso de su ruta.
 
 | Pantalla | Acción | Admin | Recepcionista | Médico | Permiso requerido |
 |---|---|---|---|---|---|
@@ -147,3 +147,32 @@ Revisada contra clinicRoutes de App.tsx, componentes finales y catálogo real: 8
 - Asignar médico exige citas.asignar_medico; excepción de hora solo flexibiliza semana, nunca bloqueos/solapamientos.
 
 La pestaña Venta libre del catálogo se puede consultar con inventario.ver. El listado de preparaciones exige venta_libre.ver y su creación venta_libre.preparar; esos dos permisos no están en los defaults actuales de recepción y deben delegarse explícitamente si se desea ese flujo. Entregar una preparación exige además inventario.entregar. Se conserva el catálogo de permisos existente.
+
+## Fase 7: acciones y autorización global
+
+El catálogo permanece en 82 permisos (admin 82, recepcionista 25, médico 36). No se agrega superadmin a perfilusuario. Los permisos funcionales no permiten cruzar clínicas.
+
+| Pantalla/acción | Admin | Recepcionista | Médico | Requisito |
+|---|---|---|---|---|
+| Propietarios: Ver detalle | Sí | Sí | Sí | propietarios.ver; pacientes.ver para relación |
+| Propietarios: Ver paciente / Editar paciente | Sí | Sí | Sí | pacientes.ver / pacientes.ver & pacientes.editar |
+| Propietarios: + Registrar paciente | Sí | Sí | Sí | propietarios.ver & pacientes.crear |
+| Propietarios: Ver expediente | Sí | No | Sí | expediente.ver; rol admin/medico |
+| Citas: Hoy/Pendientes/Todas | Sí | Sí | Sí | citas.ver; misma clínica, paginado |
+| Estudios: subir/reemplazar | Sí | No | Sí | estudios.crear o estudios.editar, consulta abierta autorizada |
+| Estudios: Ver archivo | Sí | No | Sí | estudios.ver; rol admin/medico; registro padre propio |
+| Compras: documento del proveedor | Sí | No | No | compras.recibir para subir; compras.ver para abrir |
+| Compras: Cancelar compra / Marcar no recibida | Sí | No | No | compras.administrar, estado pendiente, motivo obligatorio |
+| Configuración: Guardar logo / Eliminar logo | Sí | No | No | configuracion.ver & configuracion.editar |
+| Navegación: ver logo | Sí | Sí | Sí | perfil activo y Tenant activo |
+| Ayuda y soporte (/soporte) | Sí | Sí | Sí | perfil activo; admin tickets propios del Tenant, otros solo suyos |
+| Soporte: crear/responder/adjuntar | Sí | Sí | Sí | alcance anterior; ticket no cerrado; sin nuevo permiso funcional |
+
+| Ruta global | Acciones | Autorización |
+|---|---|---|
+| /superadmin/dashboard | Métricas administrativas | app_metadata.super_admin === true actual |
+| /superadmin/veterinarias | Listar/crear/detalle/editar/suspender/reactivar; administradores y acceso | Superadmin actual; sin clínica rutinaria |
+| /superadmin/soporte | Tickets de todos los Tenants; filtros/respuestas/estado/resolver/cerrar/adjuntos | Superadmin actual; solo soporte y logos administrativos entre Tenants |
+| /superadmin/cuenta | Correo y cambiar su contraseña | Superadmin actual; exclusivamente su cuenta |
+
+Storage es privado. Las descargas usan el JWT y autorización del padre. No existe carga, modificación ni borrado directo de los nuevos buckets desde frontend; el backend comprueba actor, Tenant, permiso, contenido y límites antes de escribir. Superadmin no puede descargar compras ni estudios. Suspender bloquea operaciones normales incluso con JWT previamente emitido. La sesión y el soporte permanecen disponibles para perfiles activos.

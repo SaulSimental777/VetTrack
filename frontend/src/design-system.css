@@ -123,3 +123,21 @@ input[type=checkbox] { accent-color:var(--brand); width:16px; height:16px; }
 @media(max-width:900px) { .app .sidebar { position:fixed; left:-270px; top:0; bottom:0; z-index:60; width:244px; transition:left .2s; } .app.sidebar-open .sidebar { left:0; } .app.sidebar-open .sidebar-backdrop { display:block; position:fixed; inset:0; background:#0d2d2399; border:0; z-index:55; } .app .sidebar .brand div:last-child { display:block; } .app .sidebar .nav-item { justify-content:flex-start; } .app .sidebar .nav-label { position:static; width:auto; height:auto; clip-path:none; white-space:normal; overflow:visible; } .app .nav-section { display:block; } .mobile-menu { display:flex; flex-shrink:0; } .app .main-content { width:100%; } .app .topbar { flex-wrap:nowrap; gap:12px; padding:15px 18px; } .app .topbar h2 { font-size:16px; } .app .user-avatar { display:none; } .app .user-info { max-width:180px; } .app .user-info span { display:none; } .app .content { padding-top:23px; } .clinical-layout { grid-template-columns:1fr; } .clinical-nav { position:static; flex-direction:row; flex-wrap:wrap; margin-bottom:8px; } }
 @media(max-width:600px) { .app .user-info { max-width:110px; } .app .topbar .breadcrumb { display:none; } .app :is(.users-page-header,.duenos-header) h3 { font-size:24px; } .app :is(.users-card-header,.duenos-card-header) { padding:16px; } .users-form-grid,.summary-grid { grid-template-columns:1fr; } .wizard-steps { grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; } .wizard-steps button { font-size:11px; padding:9px; } :is(.users-dialog-body,.modal-body,.app .clinical-card) { padding:17px; } :is(.users-dialog-header,.modal-header) { padding:17px; } :is(.users-dialog-footer,.modal-footer) { padding:14px 17px; } .operations-toolbar { padding:16px; } .operations-week { grid-template-columns:1fr; } :is(.users-table,.duenos-table) { min-width:620px; } .dashboard-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } .metric-link { padding:16px; min-height:112px; } .metric-link span { font-size:11px; } .app .users-list-controls { width:100%; } .operations-actions { width:100%; } .operations-actions>button { flex:1; } }
 @media(max-width:900px) { .user-logout .nav-label { display:none; } .app .user-info span { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:10px; } }
+.file-upload { padding:16px; margin:16px 0; border:1px dashed #9ebfae; border-radius:10px; background:#f9fcfa; min-width:0; }
+.file-upload>label { display:block; font-size:13px; font-weight:600; }
+.file-upload input[type=file] { max-width:100%; font-size:12px; padding:8px 0; }
+.file-upload .operations-actions { margin-top:12px; }
+.file-upload p,.file-link { overflow-wrap:anywhere; }
+.file-link { display:inline-flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.file-link a { color:var(--brand); font-size:13px; }
+.clinic-logo-preview { object-fit:contain; width:120px; height:90px; padding:8px; background:white; border:1px solid var(--line); border-radius:9px; display:block; margin:10px 0; }
+.sidebar-clinic-logo { padding:10px 24px 16px; display:flex; align-items:center; gap:12px; color:white; font-size:12px; }
+.sidebar-clinic-logo img { width:48px; height:48px; object-fit:contain; border-radius:8px; background:#fff; padding:5px; }
+.sidebar-clinic-logo span { overflow-wrap:anywhere; }
+.support-reply { border-top:1px solid var(--line); padding:18px 0; }
+.support-reply small { display:block; color:var(--muted); margin-top:5px; }
+.preserve-lines { white-space:pre-wrap; overflow-wrap:anywhere; }
+.status-badge.progress { color:#1d557b; background:#e9f3fb; }
+.owner-patient-summary { display:block; max-width:230px; white-space:normal; font-size:12px; line-height:1.6; }
+.appointment-quick-filters { display:flex; flex-wrap:wrap; gap:8px; padding:18px 20px 0; }
+@media(max-width:600px) { .file-upload { padding:12px; } .file-upload input[type=file] { width:100%; } .support-reply { padding:14px 0; } .clinic-logo-preview { width:100px; height:75px; } }

@@ -12,6 +12,7 @@ import { PermissionsContext } from './lib/permissions'
 import type { ClinicAccess } from './lib/permissions'
 import './App.css'
 import './design-system.css'
+import './global-ui.css'
 import { ConfirmProvider } from './components/ConfirmProvider'
 import { Icon } from './components/Icon'
 import { StoredImage } from './components/FileUpload'
@@ -34,7 +35,7 @@ const Reportes = lazy(() => import('./pages/FinalOperations').then(m => ({ defau
 const Configuracion = lazy(() => import('./pages/FinalOperations').then(m => ({ default: m.Configuracion })))
 
 const clinicRoutes = [
-  { path: '/dashboard', title: 'Dashboard', permission: 'dashboard.ver', icon: 'dashboard' },
+  { path: '/dashboard', title: 'Inicio', permission: 'dashboard.ver', icon: 'dashboard' },
   { path: '/propietarios', title: 'Propietarios', permission: 'propietarios.ver', icon: 'people' },
   { path: '/pacientes', title: 'Pacientes', permission: 'pacientes.ver', icon: 'patient' },
   { path: '/citas', title: 'Citas', permission: 'citas.ver', icon: 'calendar' },
@@ -110,38 +111,48 @@ function Workspace({ session, clinic, role, userName, title, navigation, childre
 }) {
   const [sidebar, setSidebar] = useState(false)
   const email = session.user.email || 'Sin correo electrónico'
+  const sidebarRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (!sidebar) return
+    const previous = document.activeElement
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const focusFrame = requestAnimationFrame(() => sidebarRef.current?.querySelector<HTMLElement>('.sidebar-close')?.focus())
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSidebar(false)
+      if (event.key !== 'Tab') return
+      const buttons = Array.from(sidebarRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href]') || []).filter(el => el.getClientRects().length)
+      if (event.shiftKey && document.activeElement === buttons[0]) { event.preventDefault(); buttons.at(-1)?.focus() }
+      else if (!event.shiftKey && document.activeElement === buttons.at(-1)) { event.preventDefault(); buttons[0]?.focus() }
+    }
+    window.addEventListener('keydown', keydown)
+    return () => { cancelAnimationFrame(focusFrame); document.body.style.overflow = overflow; window.removeEventListener('keydown', keydown); if (previous instanceof HTMLElement) previous.focus() }
+  }, [sidebar])
 
   return (
-    <div className={`app ${sidebar ? 'sidebar-open' : ''}`}><button type="button" className="sidebar-backdrop" aria-label="Cerrar navegación" onClick={() => setSidebar(false)} />
-      <aside className="sidebar" onClick={event => { if ((event.target as HTMLElement).closest('button')) setSidebar(false) }}>
-        <div className="brand">
-          <div className="brand-icon" aria-hidden="true">V</div>
-          <div><h1>VetTrack</h1><span>{clinic ? 'Gestión veterinaria' : 'Administración global'}</span></div>
+    <div className={`app ${clinic ? 'clinic-workspace' : 'global-workspace'} ${sidebar ? 'sidebar-open' : ''}`}>
+      <a className="skip-link" href="#workspace-content" onClick={event => { event.preventDefault(); document.getElementById('workspace-content')?.focus() }}>Ir al contenido</a>
+      <button type="button" className="mobile-menu" aria-label="Abrir navegación" aria-expanded={sidebar} aria-controls="workspace-sidebar" onClick={() => setSidebar(value => !value)}><Icon name="menu" /></button>
+      <button type="button" className="sidebar-backdrop" aria-label="Cerrar navegación" onClick={() => setSidebar(false)} />
+      <aside ref={sidebarRef} id="workspace-sidebar" className="sidebar" aria-label={clinic ? `Clínica ${clinic}` : 'VetTrack · Administración global'} onClick={event => { if ((event.target as HTMLElement).closest('button')) setSidebar(false) }}>
+        <div className="brand clinic">
+          <div className="brand-icon clinic-mark" aria-hidden="true">
+            <span>{(clinic || 'VetTrack').charAt(0).toUpperCase()}</span>
+            {clinic && logoArchivo && <StoredImage id={logoArchivo} alt={`Logo de ${clinic}`} className="sidebar-clinic-logo" />}
+          </div>
+          <div className="clinic-info"><strong title={clinic || 'VetTrack'}>{clinic || 'VetTrack'}</strong><span>{clinic ? 'Tu espacio de atención' : 'Administración global'}</span></div>
         </div>
+        <button type="button" className="sidebar-close" aria-label="Cerrar navegación" onClick={() => setSidebar(false)}>×</button>
         <nav className="navigation" aria-label="Navegación principal">{navigation}</nav>
+        <div className="sidebar-bottom">
+          <div className="sidebar-user" title={`${userName || email} · ${role || 'Superadministrador'}`}>
+            <div className="user-avatar" aria-hidden="true">{(userName || email).charAt(0).toUpperCase()}</div>
+            <div className="user-info"><strong>{userName || email}</strong><span>{role || 'Superadministrador'}</span></div>
+          </div>
+          <LogoutButton />
+        </div>
       </aside>
-      <main className="main-content">
-        <header className={`topbar${clinic ? ' topbar-clinic' : ''}`}><button type="button" className="mobile-menu" aria-label="Abrir navegación" aria-expanded={sidebar} onClick={() => setSidebar(value => !value)}><Icon name="menu" /></button>
-          <div className="workspace-title">
-            <span className="breadcrumb">VetTrack / {clinic ? `${clinic} / ` : ''}{title}</span>
-            <h2>{title}</h2>
-          </div>
-          <div className="user-area">
-            <div className="clinic">
-              {clinic && logoArchivo && <StoredImage id={logoArchivo} alt={`Logo de ${clinic}`} className="header-clinic-logo" />}
-              <div className="clinic-info">
-                <span className="clinic-label">{clinic ? 'Clínica actual' : 'Administración'}</span>
-                <strong title={clinic || 'Todas las veterinarias'}>{clinic || 'Todas las veterinarias'}</strong>
-              </div>
-            </div>
-            <div className="user-avatar" aria-hidden="true">{email.charAt(0).toUpperCase()}</div>
-            <div className="user-info">
-              <strong>{userName || (clinic ? (role || 'Usuario de clínica') : 'Superadministrador')}</strong>
-              <span title={email}>{role || 'Superadministrador'} · {clinic || 'Administración global'}</span>
-            </div>
-            <LogoutButton />
-          </div>
-        </header>
+      <main className="main-content" id="workspace-content" tabIndex={-1} aria-label={title}>
         <section className="content">{children}</section>
       </main>
     </div>
@@ -201,7 +212,7 @@ function ClinicWorkspace({ session }: { session: Session }) {
   const pageKey = `${access.id}:${access.id_veterinaria}:${access.rol}:${[...access.permisos].sort().join(',')}`
   const roleLabel = { admin: 'Administrador', recepcionista: 'Recepcionista', medico: 'Médico' }[access.rol]
 
-  if (access.estado === 'suspendido') return <PermissionsContext.Provider value={{ access, refresh, can }}><Workspace session={session} clinic={access.nombre_veterinaria} role={roleLabel} userName={access.nombre} title="Ayuda y soporte" navigation={<button type="button" className="nav-item active" aria-current="page" onClick={() => { window.location.hash='/soporte' }}><Icon name="file"/><span className="nav-label">Ayuda y soporte</span></button>}><p className="users-notice error" role="alert">Veterinaria suspendida. La operación clínica está pausada; puedes contactar a soporte. Los registros se conservan.</p><Suspense fallback={<p role="status">Cargando soporte…</p>}><Support/></Suspense></Workspace></PermissionsContext.Provider>
+  if (access.estado === 'suspendido') return <PermissionsContext.Provider value={{ access, refresh, can }}><Workspace session={session} clinic={access.nombre_veterinaria} role={roleLabel} userName={access.nombre} logoArchivo={access.logo_archivo} title="Ayuda y soporte" navigation={<button type="button" className="nav-item active" aria-current="page" onClick={() => { window.location.hash='/soporte' }}><Icon name="file"/><span className="nav-label">Ayuda y soporte</span></button>}><p className="users-notice error" role="alert">Veterinaria suspendida. La operación clínica está pausada; puedes contactar a soporte. Los registros se conservan.</p><Suspense fallback={<p role="status">Cargando soporte…</p>}><Support/></Suspense></Workspace></PermissionsContext.Provider>
 
   return (
     <PermissionsContext.Provider value={{ access, refresh, can }}>
@@ -210,7 +221,7 @@ function ClinicWorkspace({ session }: { session: Session }) {
         {clinicRoutes.filter(visible).map(item => <div key={item.path}>
           {item.path === '/configuracion/usuarios' && <div className="nav-section">Configuración</div>}
           {item.path === '/medicos' && <div className="nav-section">Administración</div>}
-          <button type="button" className={`nav-item ${path === item.path ? 'active' : ''}`} aria-current={path === item.path ? 'page' : undefined} onClick={() => { window.location.hash = item.path === '/soporte' ? `/soporte?modulo=${encodeURIComponent(path)}` : item.path }}>
+          <button type="button" className={`nav-item ${path === item.path ? 'active' : ''}`} title={item.title} aria-label={item.title} aria-current={path === item.path ? 'page' : undefined} onClick={() => { window.location.hash = item.path === '/soporte' ? `/soporte?modulo=${encodeURIComponent(path)}` : item.path }}>
             <Icon name={item.icon} /><span className="nav-label">{item.title}</span>
           </button>
         </div>)}
@@ -247,9 +258,9 @@ function ClinicWorkspace({ session }: { session: Session }) {
 function GlobalWorkspace({ session }: { session: Session }) {
   const [path,setPath]=useState(() => window.location.hash && currentClinicPath() !== '/dashboard' ? currentClinicPath() : '/superadmin/dashboard')
   useEffect(() => { const changed=()=>setPath(currentClinicPath()); window.addEventListener('hashchange',changed); return()=>window.removeEventListener('hashchange',changed) },[])
-  const routes=[['/superadmin/dashboard','Dashboard','dashboard'],['/superadmin/veterinarias','Veterinarias','people'],['/superadmin/soporte','Soporte','file'],['/superadmin/cuenta','Mi cuenta','settings']]
+  const routes=[['/superadmin/dashboard','Inicio','dashboard'],['/superadmin/veterinarias','Veterinarias','people'],['/superadmin/soporte','Soporte','file'],['/superadmin/cuenta','Mi cuenta','settings']]
   const current=routes.find(([p])=>p===path)
-  return <Workspace session={session} role="Superadmin" userName={session.user.email} title={current?.[1] || 'Acceso no autorizado'} navigation={routes.map(([p,label,icon])=><button type="button" key={p} className={`nav-item ${p===path?'active':''}`} aria-current={p===path?'page':undefined} onClick={()=>{window.location.hash=p}}><Icon name={icon}/><span className="nav-label">{label}</span></button>)}><Suspense fallback={<p role="status">Cargando administración…</p>}>{path==='/superadmin/dashboard'?<GlobalDashboard/>:path==='/superadmin/veterinarias'?<GlobalTenants/>:path==='/superadmin/soporte'?<Support global/>:path==='/superadmin/cuenta'?<GlobalAccount/>:<div className="panel access-denied" role="alert"><h3>Acceso no autorizado</h3><p>Superadmin administra la plataforma. No tiene acceso clínico rutinario.</p></div>}</Suspense></Workspace>
+  return <Workspace session={session} role="Superadmin" userName={session.user.email} title={current?.[1] || 'Acceso no autorizado'} navigation={routes.map(([p,label,icon])=><button type="button" key={p} title={label} aria-label={label} className={`nav-item ${p===path?'active':''}`} aria-current={p===path?'page':undefined} onClick={()=>{window.location.hash=p}}><Icon name={icon}/><span className="nav-label">{label}</span></button>)}><Suspense fallback={<p role="status">Cargando administración…</p>}>{path==='/superadmin/dashboard'?<GlobalDashboard/>:path==='/superadmin/veterinarias'?<GlobalTenants/>:path==='/superadmin/soporte'?<Support global/>:path==='/superadmin/cuenta'?<GlobalAccount/>:<div className="panel access-denied" role="alert"><h3>Acceso no autorizado</h3><p>Superadmin administra la plataforma. No tiene acceso clínico rutinario.</p></div>}</Suspense></Workspace>
 }
 
 function App() {

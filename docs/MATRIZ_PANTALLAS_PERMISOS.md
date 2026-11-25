@@ -4,9 +4,9 @@ Revisada contra clinicRoutes de App.tsx, componentes finales y catálogo real: 8
 
 | Pantalla | Acción | Admin | Recepcionista | Médico | Permiso requerido |
 |---|---|---|---|---|---|
-| Dashboard (/dashboard) | Abrir pantalla | Sí | Sí | Sí | dashboard.ver |
-| Dashboard | Tarjetas de indicadores | Sí | Sí | Sí | dashboard.ver |
-| Dashboard | Abrir agenda | Sí | Sí | Sí | citas.ver |
+| Inicio (/dashboard) | Abrir pantalla | Sí | Sí | Sí | dashboard.ver |
+| Inicio | Tarjetas de indicadores | Sí | Sí | Sí | dashboard.ver |
+| Inicio | Abrir agenda | Sí | Sí | Sí | citas.ver |
 | Propietarios (/propietarios) | Abrir pantalla | Sí | Sí | Sí | propietarios.ver |
 | Propietarios | + Nuevo propietario / + Registrar primer propietario | Sí | Sí | No | propietarios.crear |
 | Propietarios | Guardar propietario | Sí | Sí | No | propietarios.crear |
@@ -143,7 +143,7 @@ Revisada contra clinicRoutes de App.tsx, componentes finales y catálogo real: 8
 - Venta libre distingue preparación (venta_libre.preparar), listado (venta_libre.ver) y entrega física (inventario.entregar).
 - usuarios.permisos es exclusivo de administrador. Cédula ajena exige admin y usuarios.editar. Administradores y Superadmin mantienen sus protecciones.
 - Superadmin depende exclusivamente de app_metadata.super_admin === true, sin rol clínico superadmin.
-- Las métricas de Dashboard exigen permiso funcional de su destino.
+- Las métricas de Inicio exigen permiso funcional de su destino.
 - Asignar médico exige citas.asignar_medico; excepción de hora solo flexibiliza semana, nunca bloqueos/solapamientos.
 
 La pestaña Venta libre del catálogo se puede consultar con inventario.ver. El listado de preparaciones exige venta_libre.ver y su creación venta_libre.preparar; esos dos permisos no están en los defaults actuales de recepción y deben delegarse explícitamente si se desea ese flujo. Entregar una preparación exige además inventario.entregar. Se conserva el catálogo de permisos existente.

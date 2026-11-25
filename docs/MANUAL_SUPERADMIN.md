@@ -1,12 +1,12 @@
 # Manual de Superadmin — VetTrack
 
-Fase 7, revisado el 8 de noviembre de 2026. Superadmin administra la plataforma mediante la marca actual de Auth `app_metadata.super_admin === true`. No es un rol de clínica ni recibe acceso rutinario a expedientes, consultas, diagnósticos, tratamientos o recetas.
+Fase 8, revisado el 25 de noviembre de 2026. Superadmin administra la plataforma mediante la marca actual de Auth `app_metadata.super_admin === true`. No es un rol de clínica ni recibe acceso rutinario a expedientes, consultas, diagnósticos, tratamientos o recetas.
 
 ## Acceso y navegación
 
-Inicia sesión con tu correo y contraseña. El workspace global muestra Dashboard, Veterinarias, Soporte y Mi cuenta; Cerrar sesión está en la cabecera. En móvil usa Abrir navegación. Las rutas llevan `#`, por ejemplo `#/superadmin/dashboard`. Una ruta clínica no habilita atención médica desde esta cuenta.
+Inicia sesión con tu correo y contraseña. El workspace global muestra Inicio, Veterinarias, Soporte y Mi cuenta. El sidebar conserva la marca VetTrack arriba; la cuenta, el rol y Cerrar sesión están abajo. No hay barra superior global. En tablet la navegación usa iconos con etiquetas accesibles. En móvil usa Abrir navegación; Escape cierra el menú. Las rutas llevan `#`, por ejemplo `#/superadmin/dashboard`. Una ruta clínica no habilita atención médica desde esta cuenta.
 
-## Dashboard
+## Inicio
 
 `/superadmin/dashboard` muestra Tenants activos/suspendidos, usuarios, administradores, Tenants recientes y tickets abiertos/en atención. Son métricas administrativas reales; no muestran contenido clínico. **Actualizar** actualiza los datos.
 

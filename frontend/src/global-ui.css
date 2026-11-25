@@ -1,0 +1,98 @@
+/* Selective recovery: original module palette; approved shell and responsive fixes. */
+:root { --vt-sidebar-width:244px; }
+body { background:var(--canvas); color:var(--ink); font-size:14px; }
+:focus-visible { outline:3px solid #75b88f; outline-offset:3px; }
+.skip-link { position:fixed; top:-80px; left:16px; z-index:10000; padding:10px 16px; background:white; border:1px solid var(--line); border-radius:8px; }
+.skip-link:focus { top:12px; }
+.app .sidebar { flex:0 0 var(--vt-sidebar-width); width:var(--vt-sidebar-width); display:flex; flex-direction:column; position:sticky; top:0; height:100dvh; min-height:0; padding:20px 12px 12px; overflow:hidden; background:var(--brand-dark); color:#fff; border:0; }
+.app .brand.clinic { flex:none; display:flex; align-items:center; gap:10px; padding:0 8px 20px; margin:0; border:0; text-align:left; min-height:68px; }
+.app .clinic-mark { position:relative; width:46px; height:46px; flex:0 0 46px; display:grid; place-items:center; border-radius:10px; background:#e7f2eb; color:var(--brand-dark); overflow:hidden; font-size:23px; }
+.app .clinic-mark>span { color:var(--brand-dark); }
+.sidebar-clinic-logo { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; padding:4px; background:white; }
+.app .clinic-info { min-width:0; }
+.app .clinic-info strong { color:white; font-size:17px; line-height:1.3; white-space:normal; overflow-wrap:break-word; max-width:none; }
+.app .clinic-info>span { display:block; font-size:11px; color:#bfd4c7; margin-top:4px; }
+.app .navigation { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:0 2px 12px; gap:2px; scrollbar-width:thin; scrollbar-color:#537b65 transparent; }
+.app .nav-item { position:relative; min-height:38px; padding:9px 11px; font-size:13px; line-height:1.4; gap:10px; border-radius:7px; }
+.app .nav-item .nav-label { min-width:0; width:auto; white-space:normal; overflow-wrap:normal; text-align:left; }
+.app .nav-section { margin:16px 12px 7px; font-size:10px; }
+.app .sidebar-bottom { flex:none; margin-top:auto; padding:14px 8px 0; border-top:1px solid #37604b; }
+.sidebar-user { display:flex; align-items:center; gap:10px; min-width:0; }
+.app .sidebar .user-avatar { display:grid; width:35px; height:35px; flex-shrink:0; background:#dcece1; color:var(--brand-dark); }
+.app .sidebar .user-info { min-width:0; max-width:none; }
+.app .sidebar .user-info strong { display:block; color:white; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.app .sidebar .user-info span { display:block; color:#bfd4c7; font-size:11px; position:static; width:auto; height:auto; clip-path:none; white-space:nowrap; }
+.app .sidebar .user-logout { margin-top:8px; min-height:32px; padding:6px 0; border:0; background:transparent; color:#d4e4d9; font-size:12px; }
+.app .sidebar .user-logout .nav-label { display:inline; }
+.app .sidebar .logout-error { padding:0; color:#ffd5d5; }
+.app .main-content { flex:1; min-width:0; width:calc(100% - var(--vt-sidebar-width)); }
+.app .content { max-width:none; margin:0; padding:24px 28px 36px; }
+.sidebar-close { display:none; }
+/* Restore administrative density without removing columns, fields or actions. */
+.app :is(.users-page-header,.duenos-header,.welcome) { margin-bottom:20px; gap:14px; align-items:center; }
+.app :is(.users-page-header,.duenos-header,.welcome) h3 { font-size:25px; margin:4px 0 6px; line-height:1.25; }
+.app :is(.users-card,.duenos-card,.panel,.stat-card) { border-radius:10px; }
+.app :is(.users-card-header,.duenos-card-header,.panel-header) { padding:14px 16px; gap:12px; }
+.app :is(.clinical-card,.access-denied) { padding:18px; margin-bottom:16px; }
+.app .operations-toolbar { padding:14px 16px; gap:12px; }
+.app .operations-service-option { padding:11px 12px; margin-top:8px; }
+.app .operations-form-section { padding-top:14px; margin-top:16px; }
+.app :is(.users-empty,.duenos-empty,.dashboard-placeholder) { padding:18px 16px; }
+/* Wide data remains inside its own scroll container instead of shrinking words. */
+.app :is(.users-table-scroll,.users-table-wrap,.duenos-table-wrapper) { min-width:0; max-width:100%; overflow:auto; overscroll-behavior-x:contain; }
+.app :is(.users-table,.duenos-table) { min-width:760px; table-layout:auto; width:100%; }
+.app :is(.users-table,.duenos-table) :is(th,td) { min-width:90px; max-width:380px; padding:10px 12px; word-break:normal; overflow-wrap:normal; line-height:1.5; }
+.app :is(.users-table,.duenos-table) :is(td,th):has(.users-role,.users-state,.status-badge) { min-width:115px; white-space:nowrap; }
+.app :is(.users-date,.users-role,.users-state,.operations-status,.status-badge) { white-space:nowrap; word-break:normal; overflow-wrap:normal; }
+.app :is(.users-person,.dueno-name) { min-width:150px; }
+.app :is(.users-person,.dueno-name) strong { word-break:normal; overflow-wrap:normal; }
+.app .users-page .users-table td:nth-child(2) { min-width:180px; max-width:240px; overflow-wrap:break-word; }
+.app .users-row-actions { min-width:240px; }
+/* Keep bounded dialogs and readable inheritance controls. */
+.app :is(.users-dialog,.dueno-modal,.tenant-modal) { max-width:calc(100vw - 32px); max-height:calc(100dvh - 32px); overflow:auto; }
+.app :is(.users-dialog-header,.modal-header) { position:sticky; top:0; z-index:3; background:white; padding:16px 20px; }
+.app :is(.users-dialog-header,.modal-header) h3 { font-size:20px; overflow-wrap:break-word; }
+.app :is(.users-dialog-body,.modal-body) { min-width:0; padding:18px 20px; }
+.app :is(.users-dialog-footer,.modal-footer) { padding:12px 20px; }
+.app .users-permission-group { margin-bottom:14px; }
+.app .users-permission-group>h4 { padding:12px 14px; }
+.app .users-permission-row { grid-template-columns:minmax(180px,1fr) 85px 185px; padding:11px 14px; gap:12px; }
+.app .users-permission-row label { font-size:13px; }
+.app .users-permission-row select { min-height:38px; }
+@media (min-width:768px) and (max-width:1023px) {
+  :root { --vt-sidebar-width:72px; }
+  .app .sidebar { position:sticky; left:0; width:72px; padding:20px 10px 12px; z-index:60; }
+  .app .brand.clinic { justify-content:center; padding:0 0 18px; }
+  .app .clinic-mark { width:42px; height:42px; flex-basis:42px; }
+  .app .sidebar .clinic-info,.app .sidebar .user-info,.app .nav-section { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+  .app .navigation { padding:0; }
+  .app .nav-item { justify-content:center; padding:10px 0; }
+  .app .nav-item .nav-label,.app .sidebar .user-logout .nav-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+  .app .sidebar-bottom { padding:12px 0 0; }
+  .app .sidebar-user { justify-content:center; }
+  .app .sidebar .user-logout { width:100%; justify-content:center; }
+  .app .main-content { width:calc(100% - 72px); }
+  .app .mobile-menu { display:none; }
+  .clinical-layout { grid-template-columns:1fr; }
+}
+@media (min-width:1024px) { .app .sidebar { left:0; } .app .mobile-menu { display:none; } }
+@media (max-width:767px) {
+  .app .sidebar { position:fixed; left:-290px; top:0; bottom:0; width:270px; max-width:calc(100vw - 36px); height:100dvh; padding:24px 12px 12px; z-index:80; visibility:hidden; transition:left .18s ease; }
+  .app.sidebar-open .sidebar { left:0; visibility:visible; }
+  .app .main-content { width:100%; }
+  .app .content { padding:72px 16px 28px; }
+  .app .mobile-menu { position:fixed; top:16px; left:16px; z-index:50; display:grid; width:40px; height:40px; border-radius:9px; background:white; border-color:var(--line); }
+  .app.sidebar-open .sidebar-backdrop { display:block; position:fixed; inset:0; border:0; z-index:75; background:#0d2d2399; }
+  .app .sidebar-close { display:grid; position:absolute; right:8px; top:6px; width:28px; height:28px; place-items:center; border:0; background:transparent; color:#d4e4d9; font-size:22px; }
+  .app .sidebar .clinic-info { display:block; }
+  .app .sidebar .nav-item { justify-content:flex-start; }
+  .app .sidebar .nav-label { position:static; width:auto; height:auto; clip-path:none; overflow:visible; white-space:normal; }
+  .app .sidebar .user-logout .nav-label { display:inline; }
+  .app .nav-section { display:block; }
+  .app :is(.users-page-header,.duenos-header) { flex-direction:column; align-items:flex-start; }
+  .app :is(.users-page-header,.duenos-header)>.operations-actions { width:100%; }
+  .app .users-permission-row { grid-template-columns:minmax(0,1fr) 85px; gap:8px; }
+  .app .users-permission-row select { grid-column:1/-1; width:100%; }
+  .app .users-permissions-footer>div { width:100%; }
+}
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; } }

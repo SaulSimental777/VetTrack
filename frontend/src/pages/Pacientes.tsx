@@ -31,7 +31,7 @@ function Pacientes() {
   const [error, setError] = useState('')
   const [ownersError, setOwnersError] = useState('')
   const [busqueda, setBusqueda] = useState('')
-  const [editor, setEditor] = useState<{ paciente: Paciente | null } | null>(null)
+  const [editor, setEditor] = useState<{ paciente: Paciente | null } | null>(() => can('pacientes.crear') && new URLSearchParams(location.hash.split('?')[1] || '').get('nuevo') === '1' ? { paciente: null } : null)
   const [eliminando, setEliminando] = useState<Paciente | null>(null)
   const [pending, setPending] = useState(false)
   const [modalError, setModalError] = useState('')

@@ -99,7 +99,7 @@ function Citas() {
   const [doctor, setDoctor] = useState('')
   const [state, setState] = useState('')
   const [query, setQuery] = useState('')
-  const [editor, setEditor] = useState<{ cita: Cita | null } | null>(null)
+  const [editor, setEditor] = useState<{ cita: Cita | null } | null>(() => can('citas.crear') && new URLSearchParams(location.hash.split('?')[1] || '').get('nueva') === '1' ? { cita: null } : null)
   const [cancel, setCancel] = useState<Cita | null>(null)
   const [notice, setNotice] = useState('')
   const range = date ? clinicDayRange(date) : null

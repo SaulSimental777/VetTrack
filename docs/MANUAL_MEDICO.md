@@ -1,6 +1,6 @@
 # Manual de Médico — VetTrack
 
-Frontend de Fase 7, revisado el 8 de noviembre de 2026. Usa rutas y componentes finales. Describe defaults del catálogo real (36 permisos). usuario_permiso puede ampliar/restringir acciones; la matriz detalla requisitos. Todas las operaciones pertenecen a la clínica de sesión.
+Frontend de Fase 8, revisado el 25 de noviembre de 2026. Usa rutas y componentes finales. Describe defaults del catálogo real (36 permisos). usuario_permiso puede ampliar/restringir acciones; la matriz detalla requisitos. Todas las operaciones pertenecen a la clínica de sesión.
 
 ## Cambios de operación en Fase 7
 
@@ -16,19 +16,19 @@ Frontend de Fase 7, revisado el 8 de noviembre de 2026. Usa rutas y componentes 
 
 ## Acceso y controles comunes
 
-Inicia con correo y contraseña. No existe ruta independiente /login: la sesión determina la pantalla. La cabecera indica nombre, rol y clínica; Cerrar sesión termina el acceso. En móvil, Abrir navegación despliega menú y Cerrar navegación lo oculta; seleccionar opción lo cierra.
+Inicia con correo y contraseña. No existe ruta independiente /login: la sesión determina la pantalla. El sidebar muestra logo y nombre de la clínica arriba; avatar, usuario, rol y Cerrar sesión abajo. No hay barra superior global. En tablet se muestran iconos con etiquetas accesibles; en móvil, Abrir navegación despliega el menú y Cerrar navegación o Escape lo ocultan; seleccionar opción lo cierra.
 
 Las rutas usan #, por ejemplo #/citas. Sin permiso aparece 403 · Acceso no autorizado. El backend valida cada operación. Una cuenta inactiva no opera.
 
 Un campo con * es obligatorio. En buscadores escribe y selecciona coincidencia; flechas/Enter usan teclado, Escape cierra y Limpiar selección retira valor. Cargando opciones y Sin resultados indican estado. Cancelar o cerrar descartan el borrador; durante guardado se bloquean repeticiones. Los editores dentro de Consulta también tienen Cancelar. Tablas anchas se desplazan dentro de su contenedor en móvil. Horas de Tijuana e importes MXN.
 
-## Dashboard
+## Inicio
 
-Ruta: `/dashboard`. Fuente revisada: `frontend/src/pages/Dashboard.tsx`.
+Ruta: `/dashboard`. Fuente revisada: `frontend/src/pages/Dashboard.tsx`. El nombre visible es Inicio; la ruta y el permiso `dashboard.ver` se conservan.
 
 **Objetivo.** Identificar pendientes reales y abrir el módulo que los resuelve.
 
-**Información.** Fecha de Tijuana, indicadores autorizados y hasta diez próximas citas. Las tarjetas necesitan el permiso de su módulo. Cero significa ausencia de registros. Para el médico, citas y consultas se limitan a las asignadas.
+**Información.** Saludo personal y fecha de Tijuana. Resumen con los indicadores autorizados. Por atender y En consulta muestran un máximo de dos registros por columna, con contador total y enlace al listado completo, con citas y consultas asignadas al médico. Cada bloque conserva sus permisos; sin pagos.ver no se muestran Pagos pendientes ni Por cobrar. Los errores se distinguen de los estados vacíos.
 
 **Acciones disponibles.**
 
@@ -37,7 +37,7 @@ Ruta: `/dashboard`. Fuente revisada: `frontend/src/pages/Dashboard.tsx`.
 
 **Campos.** No captura datos.
 
-**Validaciones.** Las alertas de caducidad usan 30 días. Abre la agenda para continuar después de las diez próximas citas.
+**Validaciones.** Las alertas de caducidad usan 30 días. Abre cada módulo para consultar el listado completo. No se modifican estados al mostrar Inicio.
 
 **Resultado esperado.** Se abre el módulo de la tarjeta sin modificar información.
 

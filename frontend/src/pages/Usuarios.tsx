@@ -30,11 +30,17 @@ interface PermisosUsuario {
 type DialogState = { tipo: 'editor'; usuario: Usuario | null } | { tipo: 'password' | 'permisos' | 'estado'; usuario: Usuario }
 const roleLabels: Record<Role, string> = { admin: 'Administrador', recepcionista: 'Recepcionista', medico: 'Médico' }
 const moduleLabels: Record<string, string> = {
-  dashboard: 'Dashboard', propietarios: 'Propietarios', pacientes: 'Pacientes', usuarios: 'Usuarios',
+  dashboard: 'Inicio', propietarios: 'Propietarios', pacientes: 'Pacientes', usuarios: 'Usuarios',
   citas: 'Citas', consultas: 'Consultas', expediente: 'Expediente', diagnosticos: 'Diagnósticos',
   recetas: 'Recetas', servicios: 'Servicios', horarios: 'Horarios', inventario: 'Inventario',
   proveedores: 'Proveedores', compras: 'Compras', pagos: 'Pagos', reportes: 'Reportes', configuracion: 'Configuración',
+  orden_recepcion: 'Órdenes de recepción', venta_libre: 'Venta libre', medicos: 'Médicos',
+  tratamientos: 'Tratamientos', vacunas: 'Vacunas', desparasitacion: 'Desparasitación', estudios: 'Estudios',
+  usuario_permiso: 'Permisos de usuario', venta_preparada: 'Venta preparada', medico_especialidad: 'Especialidades médicas',
 }
+const permissionLabel = (text: string) => text
+  .replace(/\b[a-z]+(?:_[a-z]+)+\b/gi, key => moduleLabels[key.toLowerCase()] || key.replaceAll('_', ' '))
+  .replace(/\bdashboard\b/gi, 'Inicio')
 const passwordHelp = 'Mínimo 8 caracteres, con mayúscula, minúscula y número.'
 const strongPassword = (value: string) => [...value].length >= 8 && /\p{Lu}/u.test(value) && /\p{Ll}/u.test(value) && /\p{Nd}/u.test(value)
 const validEmail = (value: string) => {
@@ -455,7 +461,7 @@ function PermisosDialog({ usuario, onClose, onUpdated }: { usuario: Usuario; onC
         {error && <p className="users-notice error" role="alert">{error}</p>}
         {data && <div className="users-permission-groups">{[...groups].map(([module, permisos]) => (
           <section className="users-permission-group" key={module} aria-labelledby={`${prefix}-${module}`}>
-            <h4 id={`${prefix}-${module}`}>{moduleLabels[module] || module}</h4>
+            <h4 id={`${prefix}-${module}`}>{moduleLabels[module] || module.replaceAll('_', ' ').replace(/^./, letter => letter.toLocaleUpperCase('es'))}</h4>
             {permisos.map(permiso => {
               const inherited = data.porRol[permiso.clave] === true
               const personal = Object.hasOwn(draft, permiso.clave)
@@ -463,9 +469,9 @@ function PermisosDialog({ usuario, onClose, onUpdated }: { usuario: Usuario; onC
               const changed = draft[permiso.clave] !== data.overrides[permiso.clave]
               const effective = usuario.activo && !reserved && (changed ? personal ? draft[permiso.clave] : inherited : data.efectivos[permiso.clave] === true)
               return <div className="users-permission-row" key={permiso.clave}>
-                <div><label htmlFor={`${prefix}-${permiso.clave}`}>{permiso.descripcion}</label><small>{reserved ? 'Reservado al administrador' : personal ? 'Personalizado' : 'Heredado del rol'}</small></div>
+                <div><label htmlFor={`${prefix}-${permiso.clave}`}>{permissionLabel(permiso.descripcion)}</label><small>{reserved ? 'Reservado al administrador' : personal ? 'Personalizado' : 'Heredado del rol'}</small></div>
                 <span className={`users-permission-status ${effective ? 'allowed' : 'denied'}`}>{!usuario.activo ? 'Inactivo' : effective ? 'Permitido' : 'Denegado'}</span>
-                <select id={`${prefix}-${permiso.clave}`} aria-label={`Modo de permiso: ${permiso.descripcion}`} value={personal ? draft[permiso.clave] ? 'allow' : 'deny' : 'inherit'} disabled={mutation.pending || reserved} onChange={event => {
+                <select id={`${prefix}-${permiso.clave}`} aria-label={`Modo de permiso: ${permissionLabel(permiso.descripcion)}`} value={personal ? draft[permiso.clave] ? 'allow' : 'deny' : 'inherit'} disabled={mutation.pending || reserved} onChange={event => {
                   const mode = event.target.value
                   setDraft(previous => { const next = { ...previous }; if (mode === 'inherit') delete next[permiso.clave]; else next[permiso.clave] = mode === 'allow'; return next })
                   setSuccess('')

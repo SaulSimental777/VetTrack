@@ -1,6 +1,6 @@
 /* Approved Inicio palette is scoped here, never to administrative modules. */
-.home-page { --vt-bg:#fbf6ee; --vt-surface:#fff; --vt-primary:#1f5f6b; --vt-primary-soft:#e1eef0; --vt-accent:#ff8a6b; --vt-beige:#f3ebdd; --vt-success-bg:#e4efe3; --vt-success-text:#24502a; --vt-text:#2b2623; --vt-text-muted:#7a6f68; --vt-border:#eadfce; --vt-radius:12px; --vt-warning:#795a2e; color:var(--vt-text); max-width:1540px; margin:0 auto; }
-.app .main-content:has(.home-page) { background:#fbf6ee; }
+.home-page { --vt-bg:var(--canvas); --vt-surface:#fff; --vt-primary:#1f5f6b; --vt-primary-soft:#e1eef0; --vt-accent:#ff8a6b; --vt-beige:#f3ebdd; --vt-success-bg:#e4efe3; --vt-success-text:#24502a; --vt-text:#2b2623; --vt-text-muted:#7a6f68; --vt-border:#eadfce; --vt-radius:12px; --vt-warning:#795a2e; color:var(--vt-text); max-width:1540px; margin:0 auto; }
+.app .main-content:has(.home-page) { background:var(--canvas); }
 .home-heading .home-date { display:block; color:var(--vt-text-muted); font-size:13px; text-transform:capitalize; }
 .app .home-heading h3 { font-size:30px; letter-spacing:-.8px; margin:6px 0; color:var(--vt-text); }
 .app .home-heading p { color:var(--vt-text-muted); }
@@ -18,7 +18,7 @@
 .home-section-title h4 { font-size:18px; margin:0 0 3px; }
 .home-section-title p { margin:0; color:var(--vt-text-muted); font-size:12px; }
 .home-flow { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-items:stretch; }
-.home-column { display:flex; flex-direction:column; min-width:0; min-height:252px; background:var(--vt-beige); border:1px solid var(--vt-border); border-radius:var(--vt-radius); padding:12px; }
+.home-column { display:flex; flex-direction:column; min-width:0; min-height:252px; background:var(--vt-surface); border:1px solid var(--vt-border); border-radius:var(--vt-radius); padding:12px; }
 .home-column-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
 .home-column-heading h4 { display:flex; align-items:center; gap:7px; font-size:14px; margin:0; }
 .home-column-heading>span { background:var(--vt-surface); padding:2px 7px; min-width:24px; border-radius:6px; font-size:12px; text-align:center; }

@@ -42,10 +42,9 @@ export default function Dashboard({ clinicName }: { clinicId: string; clinicName
     return patient?.raza || patient?.especie || ''
   }
 
-  return <div className="home-page">
+  return <div className="home-page" aria-label={`Inicio de ${clinicName}`}>
     <div className="home-heading users-page-header">
-      <div><span className="home-date">{new Intl.DateTimeFormat('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Tijuana' }).format(date)}</span>
-        <h3>Hola, {access.nombre || 'bienvenido'}</h3><p>Inicio · Así va el día en {clinicName}.</p></div>
+      <div><span className="home-date">{new Intl.DateTimeFormat('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Tijuana' }).format(date)}</span></div>
       <div className="operations-actions">
         {can('citas.crear') && can('citas.ver') && <button type="button" className="primary-button home-primary" onClick={() => go('/citas?nueva=1')}>+ Nueva cita</button>}
         {can('pacientes.crear') && can('pacientes.ver') && <button type="button" className="users-secondary-button" onClick={() => go('/pacientes?nuevo=1')}>+ Paciente</button>}
